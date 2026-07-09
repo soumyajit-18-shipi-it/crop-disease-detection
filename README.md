@@ -1,5 +1,15 @@
 # Crop Disease Detection
+An AI-powered system that uses computer vision and deep learning models to detect crop diseases from plant images. The solution analyzes visual symptoms such as leaf spots, discoloration, and texture changes to accurately classify diseases. It enables early diagnosis, reduces crop losses, and helps farmers take timely preventive measures through data-driven insights.
 
+## Skill Sets
+- Python
+- Computer Vision & AI/ML
+
+## Expected Learning
+- Building computer vision models for agriculture
+- Applying deep learning for image classification
+- Developing early diagnosis systems for crops
+- Leveraging AI for data-driven farming insights
 
 
 ## Getting started
