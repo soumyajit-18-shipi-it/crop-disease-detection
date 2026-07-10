@@ -96,8 +96,17 @@ You can also document commands to lint the code or run tests. These steps help t
 ## Authors and acknowledgment
 Show your appreciation to those who have contributed to the project.
 
+## Security
+
+See [SECURITY.md](./SECURITY.md) for the responsible disclosure process and security hardening guidelines.
+
+## CI/CD
+
+This repository includes automated quality checks and validation pipelines in GitLab CI. See [.gitlab-ci.yml](./.gitlab-ci.yml) for details.
+
 ## License
-For open source projects, say how it is licensed.
+
+This project is licensed under the **GNU Affero General Public License v3.0**. See the [LICENSE](./LICENSE) file for details.
 
 ## Project status
 If you have run out of energy or time for your project, put a note at the top of the README saying that development has slowed down or stopped completely. Someone may choose to fork your project or volunteer to step in as a maintainer or owner, allowing your project to keep going. You can also make an explicit request for maintainers.

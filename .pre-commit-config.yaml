@@ -1,0 +1,61 @@
+minimum_pre_commit_version: "3.7.0"
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-json
+      - id: check-toml
+      - id: check-added-large-files
+      - id: check-merge-conflict
+      - id: detect-private-key
+
+  - repo: https://github.com/asottile/pyupgrade
+    rev: v3.16.0
+    hooks:
+      - id: pyupgrade
+        args: ["--py310-plus"]
+
+  - repo: local
+    hooks:
+      - id: ruff-format
+        name: ruff format check
+        entry: ruff format --check .
+        language: system
+        pass_filenames: false
+
+      - id: ruff
+        name: ruff lint
+        entry: ruff check .
+        language: system
+        pass_filenames: false
+
+      - id: bandit-local
+        name: bandit security scan
+        entry: bandit -r app
+        language: system
+        pass_filenames: false
+
+      - id: vulture
+        name: vulture dead code scan
+        entry: vulture app tests
+        language: system
+        pass_filenames: false
+
+      - id: pytest
+        name: pytest pre-push
+        entry: pytest
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-push]
+
+      - id: pre-push-full-validation
+        name: pre-push full validation
+        entry: pre-commit run --all-files
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-push]

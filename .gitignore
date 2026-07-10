@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.venv/
+venv/
+ENV/
+
+# Coverage
+.coverage
+htmlcov/
+
+# Ruff
+.ruff_cache/
+
+# Pytest
+.pytest_cache/
+
+# VS Code workspace
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+
+# Local envs / secrets
+.env
+.env.*
+
+# Logs
+*.log

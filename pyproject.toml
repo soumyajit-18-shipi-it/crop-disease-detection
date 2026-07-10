@@ -1,0 +1,79 @@
+[project]
+name = "crop-disease-detection"
+version = "0.1.0"
+description = "AI-powered system for detecting crop diseases from plant images"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "AGPL-3.0-or-later" }
+authors = [{ name = "Crop Disease Detection Contributors" }]
+
+[tool.ruff]
+target-version = "py310"
+line-length = 100
+
+[tool.ruff.lint]
+select = [
+  "E", "F", "W",  # pycodestyle + pyflakes
+  "B",              # bugbear
+  "I",              # isort
+  "UP",             # pyupgrade
+]
+ignore = ["E501", "B008"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["app"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+[tool.mypy]
+python_version = "3.10"
+check_untyped_defs = true
+disallow_untyped_defs = true
+warn_return_any = true
+warn_unused_ignores = true
+strict_optional = true
+no_implicit_optional = true
+show_error_codes = true
+explicit_package_bases = true
+
+files = ["app"]
+
+[tool.bandit]
+target = ["app"]
+exclude_dirs = ["app/__pycache__"]
+skips = ["B101"]
+
+[tool.vulture]
+min_confidence = 80
+paths = ["app"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q --disable-warnings --maxfail=1 --strict-markers"
+
+[tool.coverage.run]
+source = ["app"]
+branch = true
+
+[tool.coverage.report]
+show_missing = true
+fail_under = 80
+precision = 2
+exclude_lines = [
+  "pragma: no cover",
+  "if __name__ == .__main__.:",
+]
+
+[dependency-groups]
+dev = [
+    "bandit>=1.9.4",
+    "commitizen>=4.16.3",
+    "flake8>=7.3.0",
+    "mypy>=2.1.0",
+    "pre-commit>=4.6.0",
+    "pytest>=9.0.3",
+    "ruff>=0.15.15",
+    "vulture>=2.16",
+]

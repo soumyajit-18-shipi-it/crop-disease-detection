@@ -1,0 +1,30 @@
+# Git
+.git/
+.gitignore
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# CI/CD
+.gitlab-ci.yml
+.pre-commit-config.yaml
+
+# Specs
+specs/
+.specify/
+
+# VS Code
+.vscode/
+
+# Local configuration
+.env
+.env.*
