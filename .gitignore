@@ -8,6 +8,8 @@ htmlcov/
 venv/
 .venv/
 .env
+*.log
+backend/logs/
 
 # Data and model artifacts
 data/raw/
