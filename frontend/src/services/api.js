@@ -49,6 +49,15 @@ export async function getHistory(limit = 50) {
   }
 }
 
+export async function getHealth() {
+  try {
+    const response = await api.get("/health");
+    return response.data;
+  } catch (error) {
+    throw normalizeError(error);
+  }
+}
+
 export async function sendFeedback(payload) {
   try {
     const response = await api.post("/feedback", payload);
