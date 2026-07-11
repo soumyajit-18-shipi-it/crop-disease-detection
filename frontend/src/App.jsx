@@ -18,7 +18,8 @@ function App() {
     <div className="app-shell">
       <header className="topbar">
         <button className="brand-button" onClick={() => setActivePage("home")}>
-          Crop Disease Detection
+          <span className="brand-mark" aria-hidden="true">LL</span>
+          <span>Leaflight</span>
         </button>
         <nav aria-label="Primary navigation">
           <button className={activePage === "home" ? "active" : ""} onClick={() => setActivePage("home")}>
