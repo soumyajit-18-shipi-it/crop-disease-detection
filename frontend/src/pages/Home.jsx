@@ -12,24 +12,18 @@ function Home() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const previewUrl = useMemo(() => {
-    if (!selectedFile) {
-      return "";
-    }
-    return URL.createObjectURL(selectedFile);
-  }, [selectedFile]);
+  const previewUrl = useMemo(() => (selectedFile ? URL.createObjectURL(selectedFile) : ""), [selectedFile]);
 
   const handleImageSelected = async (file) => {
     setSelectedFile(file);
     setIsLoading(true);
     setError("");
-
     try {
       const prediction = await predictDisease(file);
       setResult(prediction);
       setHistory((current) => [prediction, ...current].slice(0, 5));
     } catch (err) {
-      setError(err.response?.data?.detail || "Prediction request failed. Confirm the backend is running.");
+      setError(err.message);
     } finally {
       setIsLoading(false);
     }
@@ -40,7 +34,7 @@ function Home() {
       <ImageUpload onImageSelected={handleImageSelected} isLoading={isLoading} />
       {error && <div className="error-banner">{error}</div>}
       <div className="content-grid">
-        <PredictionResult result={result} previewUrl={previewUrl} />
+        {isLoading ? <section className="result-panel skeleton" /> : <PredictionResult result={result} previewUrl={previewUrl} />}
         <ScanHistory scans={history} />
       </div>
     </div>
