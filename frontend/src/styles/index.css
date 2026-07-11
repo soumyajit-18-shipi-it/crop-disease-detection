@@ -1,0 +1,264 @@
+:root {
+  color: #1b2620;
+  background: #f5f7f2;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  line-height: 1.5;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+}
+
+button {
+  font: inherit;
+}
+
+.app-shell {
+  min-height: 100vh;
+}
+
+.topbar {
+  align-items: center;
+  background: #ffffff;
+  border-bottom: 1px solid #dbe4d7;
+  display: flex;
+  gap: 24px;
+  justify-content: space-between;
+  padding: 16px clamp(16px, 4vw, 48px);
+}
+
+.brand-button,
+.topbar nav button {
+  background: transparent;
+  border: 0;
+  color: #24342b;
+  cursor: pointer;
+}
+
+.brand-button {
+  font-weight: 800;
+}
+
+.topbar nav {
+  display: flex;
+  gap: 8px;
+}
+
+.topbar nav button {
+  border-radius: 999px;
+  padding: 8px 14px;
+}
+
+.topbar nav button.active {
+  background: #e6efe3;
+}
+
+main {
+  padding: clamp(18px, 4vw, 48px);
+}
+
+.home-layout {
+  display: grid;
+  gap: 24px;
+  margin: 0 auto;
+  max-width: 1180px;
+}
+
+.upload-panel,
+.result-panel,
+.history-panel,
+.text-panel,
+.error-banner {
+  background: #ffffff;
+  border: 1px solid #dbe4d7;
+  border-radius: 8px;
+}
+
+.upload-panel {
+  align-items: center;
+  display: flex;
+  gap: 24px;
+  justify-content: space-between;
+  padding: clamp(24px, 5vw, 44px);
+}
+
+.upload-panel.drag-active {
+  border-color: #2f7d4f;
+  box-shadow: 0 0 0 4px #dcefe4;
+}
+
+.upload-panel h1,
+.text-panel h1 {
+  font-size: clamp(2rem, 4vw, 3.4rem);
+  line-height: 1.05;
+  margin: 0 0 12px;
+}
+
+.upload-panel p,
+.text-panel p,
+.history-panel p {
+  color: #5f6f65;
+  margin: 0;
+}
+
+.primary-button {
+  background: #2f7d4f;
+  border: 0;
+  border-radius: 8px;
+  color: #ffffff;
+  cursor: pointer;
+  font-weight: 700;
+  min-width: 150px;
+  padding: 13px 18px;
+}
+
+.primary-button:disabled {
+  cursor: wait;
+  opacity: 0.7;
+}
+
+.content-grid {
+  align-items: start;
+  display: grid;
+  gap: 24px;
+  grid-template-columns: minmax(0, 1fr) 320px;
+}
+
+.result-panel {
+  display: grid;
+  gap: 24px;
+  grid-template-columns: minmax(220px, 320px) 1fr;
+  min-height: 320px;
+  padding: 20px;
+}
+
+.empty-state {
+  display: grid;
+  min-height: 320px;
+  place-items: center;
+  text-align: center;
+}
+
+.preview-image {
+  aspect-ratio: 1;
+  border-radius: 8px;
+  height: 100%;
+  max-height: 360px;
+  object-fit: cover;
+  width: 100%;
+}
+
+.eyebrow {
+  color: #2f7d4f;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0;
+  margin: 0 0 6px;
+  text-transform: uppercase;
+}
+
+.result-content h2,
+.history-panel h2,
+.text-panel h1 {
+  margin-top: 0;
+}
+
+.result-content h2 {
+  font-size: clamp(1.7rem, 3vw, 2.5rem);
+  line-height: 1.1;
+}
+
+.confidence {
+  margin: 22px 0;
+}
+
+.confidence-header {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.confidence-track {
+  background: #e9eee6;
+  border-radius: 999px;
+  height: 12px;
+  overflow: hidden;
+}
+
+.confidence-fill {
+  background: #2f7d4f;
+  height: 100%;
+}
+
+.info-grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.info-grid article {
+  background: #f7faf5;
+  border: 1px solid #e0e8dc;
+  border-radius: 8px;
+  padding: 16px;
+}
+
+.info-grid h3 {
+  margin: 0 0 8px;
+}
+
+.info-grid p {
+  color: #4f5e55;
+  margin: 0;
+}
+
+.history-panel,
+.text-panel {
+  padding: 24px;
+}
+
+.history-panel ul {
+  display: grid;
+  gap: 10px;
+  list-style: none;
+  margin: 16px 0 0;
+  padding: 0;
+}
+
+.history-panel li {
+  align-items: center;
+  background: #f7faf5;
+  border-radius: 8px;
+  display: flex;
+  justify-content: space-between;
+  padding: 12px;
+}
+
+.error-banner {
+  border-color: #e1a9a9;
+  color: #8d2525;
+  padding: 14px 16px;
+}
+
+@media (max-width: 860px) {
+  .topbar,
+  .upload-panel {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .content-grid,
+  .result-panel,
+  .info-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .topbar nav {
+    flex-wrap: wrap;
+  }
+}

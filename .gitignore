@@ -1,30 +1,28 @@
 # Python
 __pycache__/
 *.py[cod]
-*$py.class
-*.egg-info/
-.venv/
-venv/
-ENV/
-
-# Coverage
+.pytest_cache/
+.ruff_cache/
 .coverage
 htmlcov/
-
-# Ruff
-.ruff_cache/
-
-# Pytest
-.pytest_cache/
-
-# VS Code workspace
-.vscode/*
-!.vscode/settings.json
-!.vscode/extensions.json
-
-# Local envs / secrets
+venv/
+.venv/
 .env
-.env.*
 
-# Logs
-*.log
+# Data and model artifacts
+data/raw/
+data/processed/
+models/checkpoints/*.pth
+models/checkpoints/*.pt
+models/checkpoints/*.ckpt
+
+# Node
+node_modules/
+frontend/node_modules/
+frontend/dist/
+
+# OS and editors
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

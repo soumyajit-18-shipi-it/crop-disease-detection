@@ -1,4 +1,12 @@
-fastapi>=0.111.0
-uvicorn>=0.30.0
-pydantic>=2.0.0
-python-multipart>=0.0.9
+torch
+torchvision
+timm
+albumentations
+opencv-python
+scikit-learn
+pytorch-grad-cam
+numpy
+pandas
+matplotlib
+Pillow
+pytest
