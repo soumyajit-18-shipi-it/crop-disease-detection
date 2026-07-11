@@ -2,16 +2,25 @@ import { useRef, useState } from "react";
 
 const MAX_SIZE_MB = 10;
 
+function LeafIcon() {
+  return (
+    <svg className="leaf-icon" viewBox="0 0 64 64" role="img" aria-label="Leaf">
+      <path d="M53 10C31 11 15 22 12 39c-2 11 6 18 16 15 17-4 25-21 25-44Z" />
+      <path d="M17 48c9-13 19-22 31-30" />
+    </svg>
+  );
+}
+
 function ImageUpload({ onImageSelected, isLoading }) {
   const inputRef = useRef(null);
   const cameraRef = useRef(null);
   const [dragActive, setDragActive] = useState(false);
-  const [previewUrl, setPreviewUrl] = useState("");
+  const [previewName, setPreviewName] = useState("");
   const [error, setError] = useState("");
 
   const validate = (file) => {
     if (!file) return "No file selected.";
-    if (!file.type.startsWith("image/")) return "Please choose an image file.";
+    if (!file.type.startsWith("image/")) return "Please choose a JPG or PNG leaf image.";
     if (file.size > MAX_SIZE_MB * 1024 * 1024) return `Image must be ${MAX_SIZE_MB}MB or smaller.`;
     return "";
   };
@@ -23,7 +32,7 @@ function ImageUpload({ onImageSelected, isLoading }) {
       return;
     }
     setError("");
-    setPreviewUrl(URL.createObjectURL(file));
+    setPreviewName(file.name);
     onImageSelected(file);
   };
 
@@ -41,7 +50,7 @@ function ImageUpload({ onImageSelected, isLoading }) {
         handleFile(event.dataTransfer.files?.[0]);
       }}
     >
-      <input ref={inputRef} type="file" accept="image/*" onChange={(event) => handleFile(event.target.files?.[0])} hidden />
+      <input ref={inputRef} type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => handleFile(event.target.files?.[0])} hidden />
       <input
         ref={cameraRef}
         type="file"
@@ -50,16 +59,19 @@ function ImageUpload({ onImageSelected, isLoading }) {
         onChange={(event) => handleFile(event.target.files?.[0])}
         hidden
       />
-      <div className="upload-copy">
-        <p className="eyebrow">Field scan</p>
-        <h1>Diagnose a leaf image</h1>
-        <p>Drop a crop leaf photo here, choose one from your device, or capture a fresh field image on mobile.</p>
-        {error && <p className="inline-error">{error}</p>}
+      <div className="drop-zone" onClick={() => inputRef.current?.click()} role="button" tabIndex={0}>
+        <LeafIcon />
+        <div>
+          <p className="eyebrow"><span></span>Upload image</p>
+          <h2>Drop leaf image here</h2>
+          <p>JPG or PNG up to 10MB. Natural light, leaf flat, symptomatic area centered.</p>
+          {previewName && <p className="file-readout">{previewName}</p>}
+          {error && <p className="inline-error">{error}</p>}
+        </div>
       </div>
-      {previewUrl && <img className="upload-preview" src={previewUrl} alt="Selected leaf preview" />}
       <div className="upload-actions">
         <button className="primary-button" disabled={isLoading} onClick={() => inputRef.current?.click()}>
-          {isLoading ? "Scanning..." : "Choose Image"}
+          {isLoading ? "Analyzing" : "Choose Image"}
         </button>
         <button className="secondary-button" disabled={isLoading} onClick={() => cameraRef.current?.click()}>
           Use Camera

@@ -1,18 +1,25 @@
+function severityClass(severity = "") {
+  const normalized = severity.toLowerCase();
+  if (normalized.includes("severe")) return "severity severe";
+  if (normalized.includes("moderate")) return "severity moderate";
+  if (normalized.includes("mild") || normalized.includes("healthy")) return "severity mild";
+  return "severity review";
+}
+
 function DiseaseInfoCard({ crop, diseaseName, severity, symptoms, treatment }) {
   return (
     <div className="info-grid">
-      <article>
-        <h3>Disease Profile</h3>
-        <p><strong>Crop:</strong> {crop || "Unknown"}</p>
-        <p><strong>Disease:</strong> {diseaseName || "Unknown"}</p>
-        <p><strong>Severity:</strong> {severity || "needs expert review"}</p>
-      </article>
-      <article>
-        <h3>Symptoms</h3>
+      <article className="disease-profile">
+        <div className="chip-row">
+          {crop && <span className="chip">{crop}</span>}
+          <span className={severityClass(severity)}>{severity || "needs expert review"}</span>
+        </div>
+        <h3>{diseaseName || "Disease profile"}</h3>
         <p>{symptoms}</p>
       </article>
-      <article className="wide-card">
-        <h3>Recommended Treatment</h3>
+      <article className="treatment-card">
+        <p className="eyebrow"><span></span>Advice</p>
+        <h3>Recommended treatment</h3>
         <p>{treatment}</p>
       </article>
     </div>
