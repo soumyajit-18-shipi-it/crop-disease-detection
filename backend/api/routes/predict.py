@@ -1,28 +1,75 @@
-from fastapi import APIRouter, File, HTTPException, UploadFile
+from __future__ import annotations
 
-from backend.api.model_loader import mock_predict
-from backend.api.routes.disease_info import get_disease_info_by_class
+import hashlib
+from io import BytesIO
+
+from fastapi import APIRouter, File, HTTPException, UploadFile
+from PIL import Image, UnidentifiedImageError
+
+from backend.api.model_loader import model_service
+from backend.api.routes.disease_info import db_connect, get_disease_info_by_class
 from backend.api.schemas import PredictionResponse
+from backend.config import settings
 
 
 router = APIRouter(tags=["prediction"])
 
 
-@router.post("/predict", response_model=PredictionResponse)
-async def predict(file: UploadFile = File(...)) -> PredictionResponse:
-    if file.content_type and not file.content_type.startswith("image/"):
-        raise HTTPException(status_code=400, detail="Please upload an image file.")
-
-    image_bytes = await file.read()
+def _validate_upload(content: bytes, content_type: str | None) -> Image.Image:
+    if len(content) > settings.max_upload_size_bytes:
+        raise HTTPException(status_code=413, detail=f"Image exceeds {settings.max_upload_size_mb}MB limit.")
+    if content_type and not content_type.startswith("image/"):
+        raise HTTPException(status_code=400, detail="Please upload a valid image file.")
     try:
-        prediction = mock_predict(image_bytes=image_bytes, filename=file.filename)
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        image = Image.open(BytesIO(content))
+        image.verify()
+        return Image.open(BytesIO(content)).convert("RGB")
+    except (UnidentifiedImageError, OSError) as exc:
+        raise HTTPException(status_code=400, detail="Uploaded file is not a readable image.") from exc
 
+
+def _save_scan(class_name: str, confidence: float, image_hash: str) -> None:
+    with db_connect() as conn:
+        conn.execute(
+            "INSERT INTO scans (predicted_class, confidence, image_hash) VALUES (?, ?, ?)",
+            (class_name, confidence, image_hash),
+        )
+        conn.commit()
+
+
+def _enrich_prediction(prediction: dict, image_hash: str) -> PredictionResponse:
     disease = get_disease_info_by_class(str(prediction["class_name"]))
+    _save_scan(str(prediction["class_name"]), float(prediction["confidence"]), image_hash)
     return PredictionResponse(
         class_name=disease["class_name"],
         confidence=float(prediction["confidence"]),
+        top_3_predictions=prediction.get("top_3_predictions", []),
+        crop=disease.get("crop"),
+        disease_name=disease.get("disease_name"),
         symptoms=disease["symptoms"],
         recommended_treatment=disease["recommended_treatment"],
+        severity_level=disease.get("severity_level"),
+        mode=prediction.get("mode", "mock"),
     )
+
+
+@router.post("/predict", response_model=PredictionResponse)
+async def predict(file: UploadFile = File(...)) -> PredictionResponse:
+    content = await file.read()
+    image = _validate_upload(content, file.content_type)
+    prediction = model_service.predict(image)
+    image_hash = hashlib.sha256(content).hexdigest()
+    return _enrich_prediction(prediction, image_hash)
+
+
+@router.post("/predict/batch", response_model=list[PredictionResponse])
+async def predict_batch(files: list[UploadFile] = File(...)) -> list[PredictionResponse]:
+    if not files:
+        raise HTTPException(status_code=400, detail="Upload at least one image.")
+    responses = []
+    for file in files:
+        content = await file.read()
+        image = _validate_upload(content, file.content_type)
+        prediction = model_service.predict(image)
+        responses.append(_enrich_prediction(prediction, hashlib.sha256(content).hexdigest()))
+    return responses
