@@ -1,21 +1,48 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
+import random
 import shutil
 from collections import Counter
 from pathlib import Path
 
-from sklearn.model_selection import train_test_split
-
-
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
+
+
+def _image_count(path: Path) -> int:
+    return sum(1 for item in path.rglob("*") if item.suffix.lower() in IMAGE_EXTENSIONS)
+
+
+def detect_dataset_root(raw_dir: str | Path = "data/raw") -> Path:
+    """Find the PlantVillage class-folder root under a downloaded Kaggle tree."""
+    raw_path = Path(raw_dir)
+    if not raw_path.exists():
+        raise FileNotFoundError(f"Raw data directory does not exist: {raw_path}")
+
+    candidates: list[tuple[int, int, Path]] = []
+    for path in [raw_path, *[p for p in raw_path.rglob("*") if p.is_dir()]]:
+        class_dirs = []
+        for child in path.iterdir():
+            if not child.is_dir():
+                continue
+            direct_images = [p for p in child.iterdir() if p.is_file() and p.suffix.lower() in IMAGE_EXTENSIONS]
+            if direct_images:
+                class_dirs.append(child)
+        if class_dirs:
+            candidates.append((len(class_dirs), sum(_image_count(p) for p in class_dirs), path))
+
+    if not candidates:
+        raise FileNotFoundError(f"No class folders with images found under {raw_path}")
+    candidates.sort(key=lambda item: (item[1], item[0], -len(item[2].parts)), reverse=True)
+    return candidates[0][2]
 
 
 def _class_images(raw_dir: Path) -> dict[str, list[Path]]:
     classes: dict[str, list[Path]] = {}
     for class_dir in sorted(path for path in raw_dir.iterdir() if path.is_dir()):
-        images = [p for p in class_dir.rglob("*") if p.suffix.lower() in IMAGE_EXTENSIONS]
+        images = [p for p in class_dir.iterdir() if p.is_file() and p.suffix.lower() in IMAGE_EXTENSIONS]
         if images:
             classes[class_dir.name] = images
     if not classes:
@@ -28,6 +55,54 @@ def _copy_split(items: list[tuple[Path, str]], output_dir: Path, split: str) -> 
         dest_dir = output_dir / split / class_name
         dest_dir.mkdir(parents=True, exist_ok=True)
         shutil.copy2(image_path, dest_dir / image_path.name)
+
+
+def _file_hash(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as file:
+        for chunk in iter(lambda: file.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _stratified_duplicate_safe_split(
+    classes: dict[str, list[Path]],
+    seed: int,
+) -> tuple[list[tuple[Path, str]], list[tuple[Path, str]], list[tuple[Path, str]]]:
+    rng = random.Random(seed)
+    train_items: list[tuple[Path, str]] = []
+    val_items: list[tuple[Path, str]] = []
+    test_items: list[tuple[Path, str]] = []
+
+    for class_name, images in sorted(classes.items()):
+        groups_by_hash: dict[str, list[Path]] = {}
+        for image in images:
+            groups_by_hash.setdefault(_file_hash(image), []).append(image)
+
+        groups = list(groups_by_hash.values())
+        rng.shuffle(groups)
+        total = sum(len(group) for group in groups)
+        targets = {
+            "train": round(total * 0.70),
+            "val": round(total * 0.15),
+            "test": total - round(total * 0.70) - round(total * 0.15),
+        }
+        split_groups = {"train": [], "val": [], "test": []}
+        split_counts = {"train": 0, "val": 0, "test": 0}
+
+        for group in sorted(groups, key=len, reverse=True):
+            split = min(
+                ("train", "val", "test"),
+                key=lambda name: split_counts[name] / max(targets[name], 1),
+            )
+            split_groups[split].extend(group)
+            split_counts[split] += len(group)
+
+        train_items.extend((image, class_name) for image in split_groups["train"])
+        val_items.extend((image, class_name) for image in split_groups["val"])
+        test_items.extend((image, class_name) for image in split_groups["test"])
+
+    return train_items, val_items, test_items
 
 
 def _write_mapping(class_names: list[str], mapping_path: Path) -> None:
@@ -43,31 +118,18 @@ def _write_mapping(class_names: list[str], mapping_path: Path) -> None:
 
 
 def split_dataset(
-    raw_dir: str | Path = "data/raw/PlantVillage",
+    raw_dir: str | Path = "data/raw",
     processed_dir: str | Path = "data/processed",
     mapping_path: str | Path = "data/class_mapping.json",
     seed: int = 42,
 ) -> None:
-    raw_path = Path(raw_dir)
+    raw_path = detect_dataset_root(raw_dir)
+    print(f"Detected dataset root: {raw_path}")
     output_path = Path(processed_dir)
     classes = _class_images(raw_path)
     class_names = sorted(classes)
 
-    all_items = [(image, class_name) for class_name, images in classes.items() for image in images]
-    labels = [class_name for _, class_name in all_items]
-    train_items, temp_items, train_labels, temp_labels = train_test_split(
-        all_items,
-        labels,
-        test_size=0.30,
-        random_state=seed,
-        stratify=labels,
-    )
-    val_items, test_items = train_test_split(
-        temp_items,
-        test_size=0.50,
-        random_state=seed,
-        stratify=temp_labels,
-    )
+    train_items, val_items, test_items = _stratified_duplicate_safe_split(classes, seed)
 
     if output_path.exists():
         shutil.rmtree(output_path)
@@ -90,7 +152,7 @@ def split_dataset(
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Split PlantVillage into train/val/test.")
-    parser.add_argument("--raw-dir", default="data/raw/PlantVillage")
+    parser.add_argument("--raw-dir", default="data/raw")
     parser.add_argument("--processed-dir", default="data/processed")
     parser.add_argument("--mapping-path", default="data/class_mapping.json")
     parser.add_argument("--seed", type=int, default=42)
