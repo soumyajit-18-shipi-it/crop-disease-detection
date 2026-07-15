@@ -1,0 +1,16 @@
+torch
+torchvision
+timm
+albumentations
+opencv-python
+scikit-learn
+grad-cam
+numpy
+pandas
+matplotlib
+Pillow
+pytest
+PyYAML
+tqdm
+onnx
+onnxruntime

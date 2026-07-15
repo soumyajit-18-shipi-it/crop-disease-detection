@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+venv/
+.venv/
+.env
+*.log
+backend/logs/
+
+# Data and model artifacts
+data/raw/
+data/processed/
+models/checkpoints/*.pth
+models/checkpoints/*.pt
+models/checkpoints/*.ckpt
+
+# Node
+node_modules/
+frontend/node_modules/
+frontend/dist/
+
+# OS and editors
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
