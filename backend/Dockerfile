@@ -5,6 +5,7 @@ COPY backend/requirements.txt ./requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY backend ./backend
+COPY src ./src
 COPY data/class_mapping.json ./data/class_mapping.json
 COPY models/model_config.json ./models/model_config.json
 COPY models/onnx ./models/onnx

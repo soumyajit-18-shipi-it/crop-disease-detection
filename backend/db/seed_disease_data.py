@@ -31,21 +31,21 @@ VERIFIED_ENTRIES = {
         "Increase ventilation, reduce humidity, prune dense foliage, and use resistant varieties where possible. Fungicide recommendations need expert review.",
         "moderate",
     ),
-    "Potato_Early_blight": (
+    "Potato___Early_blight": (
         "Potato",
         "Early blight",
         "Dark target-like leaf spots usually begin on older leaves. Defoliation can reduce tuber yield if disease pressure is high.",
         "Rotate crops, manage volunteer plants, maintain plant vigor, and seek local guidance for fungicide timing. Needs expert review for chemical recommendations.",
         "moderate",
     ),
-    "Potato_Late_blight": (
+    "Potato___Late_blight": (
         "Potato",
         "Late blight",
         "Irregular water-soaked lesions and white sporulation may appear on leaf undersides during humid weather. Tubers can develop brown rot after infection.",
         "Remove infected material, manage cull piles, avoid overhead irrigation, and consult local late-blight alerts. Needs expert review before pesticide use.",
         "severe",
     ),
-    "Tomato_Healthy": (
+    "Tomato_healthy": (
         "Tomato",
         "Healthy",
         "Leaves appear green and uniform without obvious lesions or discoloration. Continue monitoring because early symptoms can be subtle.",

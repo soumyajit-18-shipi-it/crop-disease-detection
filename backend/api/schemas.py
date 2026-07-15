@@ -18,6 +18,7 @@ class PredictionResponse(BaseModel):
     recommended_treatment: str
     severity_level: str | None = None
     mode: str = "mock"
+    mock: bool = True
 
 
 class DiseaseInfo(BaseModel):
