@@ -12,11 +12,11 @@ services:
       - key: ENVIRONMENT
         value: production
       - key: APP_URL
-        value: https://crop-disease.vercel.app
+        value: https://crop-disease-lime.vercel.app
       - key: CORS_ORIGINS
-        value: https://crop-disease.vercel.app
+        value: https://crop-disease-lime.vercel.app
       - key: OAUTH_CALLBACK_URL
-        value: https://crop-disease.vercel.app/api/auth/google/callback
+        value: https://crop-disease-lime.vercel.app/api/auth/google/callback
       - key: COOKIE_SECURE
         value: "true"
       - key: COOKIE_SAMESITE

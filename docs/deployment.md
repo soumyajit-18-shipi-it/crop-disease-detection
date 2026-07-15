@@ -2,13 +2,15 @@
 
 Leaflight's production architecture is:
 
-- Frontend: Vercel at `https://crop-disease.vercel.app`
+- Frontend: Vercel at `https://crop-disease-lime.vercel.app`
 - API: Render at `https://crop-disease-api-xcz2.onrender.com`
 - Database: Supabase PostgreSQL project `imzoacxlzqrdheftlkhl`
 - Authentication: the backend's Google OAuth code flow, opaque server sessions, and double-submit CSRF
 - Inference: immutable EfficientNetV2-S ONNX release `v1`
 
-The frontend uses a same-origin Vercel rewrite. Browser requests go to `/api/*`, which Vercel proxies to Render. This keeps the session and CSRF cookies first-party on `crop-disease.vercel.app` and allows `Secure; SameSite=Lax; Path=/` cookies. The API rewrite is listed before the SPA fallback in `frontend/vercel.json`.
+The requested `https://crop-disease.vercel.app` alias is owned by another Vercel account. Vercel rejected the alias assignment, so the service uses the account-owned `https://crop-disease-lime.vercel.app` alias. Do not configure OAuth or backend trust for the unowned hostname.
+
+The frontend uses a same-origin Vercel rewrite. Browser requests go to `/api/*`, which Vercel proxies to Render. This keeps the session and CSRF cookies first-party on `crop-disease-lime.vercel.app` and allows `Secure; SameSite=Lax; Path=/` cookies. The API rewrite is listed before the SPA fallback in `frontend/vercel.json`.
 
 ## Local setup
 
@@ -91,9 +93,9 @@ DATABASE_URL=<supavisor-session-pooler-url-with-ssl>
 GOOGLE_CLIENT_ID=<existing-web-client-id>
 GOOGLE_CLIENT_SECRET=<existing-web-client-secret>
 AUTH_SECRET=<at-least-64-random-characters>
-APP_URL=https://crop-disease.vercel.app
-CORS_ORIGINS=https://crop-disease.vercel.app
-OAUTH_CALLBACK_URL=https://crop-disease.vercel.app/api/auth/google/callback
+APP_URL=https://crop-disease-lime.vercel.app
+CORS_ORIGINS=https://crop-disease-lime.vercel.app
+OAUTH_CALLBACK_URL=https://crop-disease-lime.vercel.app/api/auth/google/callback
 COOKIE_SECURE=true
 COOKIE_SAMESITE=lax
 LOG_TO_FILE=false
@@ -125,8 +127,8 @@ The production value is `VITE_API_URL=/api`. Framework is Vite, install command 
 The existing Google OAuth Web Application must contain these exact production values:
 
 ```text
-Authorized JavaScript origin: https://crop-disease.vercel.app
-Authorized redirect URI: https://crop-disease.vercel.app/api/auth/google/callback
+Authorized JavaScript origin: https://crop-disease-lime.vercel.app
+Authorized redirect URI: https://crop-disease-lime.vercel.app/api/auth/google/callback
 ```
 
 Keep the `127.0.0.1` development values if local sign-in is still needed. Do not add `localhost`, preview domains, or the direct Render callback to this architecture.

@@ -23,8 +23,8 @@ Leaflight uses Google's OAuth 2.0 authorization-code flow in the FastAPI backend
 7. For production, add this exact origin and callback:
 
    ```text
-   Authorized JavaScript origin: https://crop-disease.vercel.app
-   Authorized redirect URI: https://crop-disease.vercel.app/api/auth/google/callback
+   Authorized JavaScript origin: https://crop-disease-lime.vercel.app
+   Authorized redirect URI: https://crop-disease-lime.vercel.app/api/auth/google/callback
    ```
 
 The callback scheme, host, port, path, case, and trailing slash must match `OAUTH_CALLBACK_URL` exactly. Do not add wildcards. Keep the downloaded client configuration and client secret outside the repository.
@@ -62,7 +62,7 @@ npm.cmd --prefix frontend run dev -- --host 127.0.0.1 --port 5173
 
 ## Production environment
 
-Production uses Vercel's same-origin `/api` rewrite to Render. Set `APP_URL` and `CORS_ORIGINS` to `https://crop-disease.vercel.app`, set `OAUTH_CALLBACK_URL` to `https://crop-disease.vercel.app/api/auth/google/callback`, leave `COOKIE_SECURE=true` and `COOKIE_SAMESITE=lax`, and leave `COOKIE_DOMAIN` unset. Render uses an SSL Supabase PostgreSQL `DATABASE_URL`; it never uses SQLite or Render's ephemeral filesystem for persistence.
+Production uses Vercel's same-origin `/api` rewrite to Render. Set `APP_URL` and `CORS_ORIGINS` to `https://crop-disease-lime.vercel.app`, set `OAUTH_CALLBACK_URL` to `https://crop-disease-lime.vercel.app/api/auth/google/callback`, leave `COOKIE_SECURE=true` and `COOKIE_SAMESITE=lax`, and leave `COOKIE_DOMAIN` unset. Render uses an SSL Supabase PostgreSQL `DATABASE_URL`; it never uses SQLite or Render's ephemeral filesystem for persistence.
 
 Sessions expire after `SESSION_TTL_HOURS` (168 hours by default). Logout revokes the database session immediately. Expired, revoked, missing, or altered cookies produce HTTP 401. State-changing routes additionally require the matching `X-CSRF-Token` header; a mismatched token produces HTTP 403.
 

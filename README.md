@@ -5,9 +5,11 @@ Leaflight is a full-stack crop disease detection platform for analyzing plant le
 > [!IMPORTANT]
 > The application actively serves the parity-verified EfficientNetV2-S `v1` release at `models/releases/efficientnetv2_s_v1/`. The 80.7 MB ONNX binary is intentionally excluded from Git; the small release manifest, metadata, metrics, and checksums are tracked. Run `python scripts/download_model.py` to obtain or verify the exact binary. If the release is missing or invalid, `/health` returns HTTP 503 with `model_loaded: false`, and prediction endpoints fail closed.
 
-Production frontend: `https://crop-disease.vercel.app`
+Production frontend: `https://crop-disease-lime.vercel.app`
 
 Production API: `https://crop-disease-api-xcz2.onrender.com`
+
+The requested `crop-disease.vercel.app` alias is owned by a different Vercel account. The deployment intentionally uses the account-owned alias above; authentication must never redirect through the unowned hostname.
 
 ## Latest Features
 
