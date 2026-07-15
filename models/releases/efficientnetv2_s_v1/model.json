@@ -1,0 +1,315 @@
+{
+  "schema_version": "2.5",
+  "architecture": "efficientnetv2_s",
+  "model_name": "EfficientNetV2-S",
+  "model_version": "v1",
+  "num_classes": 15,
+  "input": {
+    "width": 300,
+    "height": 300,
+    "channels": 3,
+    "layout": "NCHW",
+    "dtype": "float32"
+  },
+  "image_size": 300,
+  "class_to_idx": {
+    "Pepper__bell___Bacterial_spot": 0,
+    "Pepper__bell___healthy": 1,
+    "Potato___Early_blight": 2,
+    "Potato___Late_blight": 3,
+    "Potato___healthy": 4,
+    "Tomato_Bacterial_spot": 5,
+    "Tomato_Early_blight": 6,
+    "Tomato_Late_blight": 7,
+    "Tomato_Leaf_Mold": 8,
+    "Tomato_Septoria_leaf_spot": 9,
+    "Tomato_Spider_mites_Two_spotted_spider_mite": 10,
+    "Tomato__Target_Spot": 11,
+    "Tomato__Tomato_YellowLeaf__Curl_Virus": 12,
+    "Tomato__Tomato_mosaic_virus": 13,
+    "Tomato_healthy": 14
+  },
+  "idx_to_class": {
+    "0": "Pepper__bell___Bacterial_spot",
+    "1": "Pepper__bell___healthy",
+    "2": "Potato___Early_blight",
+    "3": "Potato___Late_blight",
+    "4": "Potato___healthy",
+    "5": "Tomato_Bacterial_spot",
+    "6": "Tomato_Early_blight",
+    "7": "Tomato_Late_blight",
+    "8": "Tomato_Leaf_Mold",
+    "9": "Tomato_Septoria_leaf_spot",
+    "10": "Tomato_Spider_mites_Two_spotted_spider_mite",
+    "11": "Tomato__Target_Spot",
+    "12": "Tomato__Tomato_YellowLeaf__Curl_Virus",
+    "13": "Tomato__Tomato_mosaic_virus",
+    "14": "Tomato_healthy"
+  },
+  "preprocessing": {
+    "image_size": 300,
+    "resize_mode": "shortest_center_crop",
+    "resize_strategy": "shortest_side",
+    "crop_strategy": "center_crop",
+    "crop_pct": 1.0,
+    "interpolation": "bicubic",
+    "mean": [
+      0.5,
+      0.5,
+      0.5
+    ],
+    "std": [
+      0.5,
+      0.5,
+      0.5
+    ],
+    "input_color_space": "RGB",
+    "input_range": [
+      0.0,
+      1.0
+    ],
+    "source": "timm_pretrained_config"
+  },
+  "normalization": {
+    "mean": [
+      0.5,
+      0.5,
+      0.5
+    ],
+    "std": [
+      0.5,
+      0.5,
+      0.5
+    ]
+  },
+  "config": {
+    "experiment_name": "crop_disease_phase2_5",
+    "data": {
+      "sources": [
+        {
+          "name": "plantvillage",
+          "type": "pre_split_image_folder",
+          "path": "data/processed",
+          "optional": false,
+          "enabled": true,
+          "weight": 1.0
+        },
+        {
+          "name": "plantdoc",
+          "type": "recursive_image_folder",
+          "path": "data/raw/PlantDoc",
+          "optional": true,
+          "enabled": true,
+          "weight": 1.0
+        },
+        {
+          "name": "field_survey",
+          "type": "validated_manifest",
+          "path": "data/manifests/field_survey/validated_manifest.json",
+          "optional": true,
+          "enabled": true,
+          "weight": 1.0
+        }
+      ],
+      "split_manifest": "data/splits/phase1_split.json",
+      "train_ratio": 0.7,
+      "val_ratio": 0.15,
+      "test_ratio": 0.15,
+      "image_size": 300,
+      "use_model_preprocessing": true,
+      "batch_size": 12,
+      "num_workers": 2,
+      "pin_memory": true,
+      "persistent_workers": false,
+      "prefetch_factor": 2,
+      "class_balanced_sampling": false,
+      "sampler_replacement": true
+    },
+    "augmentation": {
+      "enabled": true,
+      "random_resized_crop_scale": [
+        0.72,
+        1.0
+      ],
+      "random_resized_crop_ratio": [
+        0.8,
+        1.25
+      ],
+      "horizontal_flip_probability": 0.5,
+      "vertical_flip_probability": 0.2,
+      "geometry_probability": 0.45,
+      "shift_limit": 0.06,
+      "scale_limit": 0.12,
+      "rotate_limit": 25,
+      "perspective_scale": 0.05,
+      "color_probability": 0.6,
+      "brightness_contrast_weight": 1.0,
+      "clahe_weight": 0.35,
+      "hue_saturation_value_weight": 0.55,
+      "rgb_shift_weight": 0.25,
+      "gamma_weight": 0.45,
+      "blur_probability": 0.16,
+      "motion_blur_weight": 0.35,
+      "gaussian_blur_weight": 0.4,
+      "defocus_weight": 0.25,
+      "weather_probability": 0.1,
+      "shadow_weight": 1.0,
+      "fog_weight": 0.18,
+      "rain_weight": 0.0,
+      "compression_probability": 0.14,
+      "jpeg_quality_min": 65,
+      "coarse_dropout_probability": 0.12,
+      "coarse_dropout_holes": [
+        1,
+        4
+      ],
+      "coarse_dropout_size": [
+        0.03,
+        0.12
+      ],
+      "mixup_alpha": 0.2,
+      "mixup_probability": 0.15,
+      "cutmix_alpha": 1.0,
+      "cutmix_probability": 0.15
+    },
+    "model": {
+      "architecture": "efficientnetv2_s",
+      "architectures": [
+        "efficientnetv2_s",
+        "convnext_tiny",
+        "convnext_base"
+      ],
+      "optional_architectures": [
+        "swin_tiny"
+      ],
+      "pretrained": true,
+      "dropout": 0.2,
+      "drop_path_rate": 0.1,
+      "architecture_overrides": {
+        "efficientnetv2_s": {
+          "batch_size": 12,
+          "gradient_accumulation_steps": 3,
+          "learning_rate": 0.0002
+        },
+        "convnext_tiny": {
+          "batch_size": 8,
+          "gradient_accumulation_steps": 4,
+          "learning_rate": 0.0002,
+          "layer_decay": 0.8
+        },
+        "convnext_base": {
+          "batch_size": 2,
+          "gradient_accumulation_steps": 16,
+          "learning_rate": 0.0001,
+          "layer_decay": 0.8
+        },
+        "swin_tiny": {
+          "batch_size": 4,
+          "gradient_accumulation_steps": 8,
+          "learning_rate": 0.0001,
+          "layer_decay": 0.8
+        }
+      }
+    },
+    "optimization": {
+      "optimizer": "adamw",
+      "learning_rate": 0.0002,
+      "weight_decay": 0.02,
+      "betas": [
+        0.9,
+        0.999
+      ],
+      "eps": 1e-08,
+      "filter_bias_and_norm_from_weight_decay": true,
+      "layer_decay": null,
+      "epochs": 40,
+      "warmup_epochs": 3,
+      "warmup_start_factor": 0.01,
+      "min_learning_rate": 1e-06,
+      "label_smoothing": 0.1,
+      "class_weighting": true,
+      "class_weight_strategy": "effective_num",
+      "effective_num_beta": 0.9999,
+      "gradient_clip_norm": 1.0,
+      "gradient_accumulation_steps": 3
+    },
+    "runtime": {
+      "seed": 42,
+      "device": "auto",
+      "mixed_precision": true,
+      "amp_dtype": "float16",
+      "deterministic": true,
+      "deterministic_warn_only": true,
+      "ema_enabled": true,
+      "ema_decay": 0.9999,
+      "early_stopping_patience": 8,
+      "early_stopping_monitor": "macro_f1",
+      "early_stopping_mode": "max",
+      "early_stopping_min_delta": 0.0001
+    },
+    "evaluation": {
+      "calibration_bins": 15,
+      "temperature_max_iterations": 75,
+      "latency_warmup_iterations": 10,
+      "latency_iterations": 50
+    },
+    "selection": {
+      "validation_macro_f1_weight": 0.4,
+      "calibration_weight": 0.2,
+      "inference_speed_weight": 0.15,
+      "model_size_weight": 0.15,
+      "memory_weight": 0.1,
+      "require_all_candidates": true
+    },
+    "output": {
+      "run_root": "artifacts/training",
+      "onnx_opset": 18,
+      "parity_atol": 0.0001,
+      "parity_rtol": 0.001
+    }
+  },
+  "created_at": "2026-07-14T12:07:09.278860+00:00",
+  "split_manifest": "data/splits/phase1_split.json",
+  "split_manifest_sha256": "f41148f03b29fe0cda41ea8b3caecf35d7c2d2299afd401013b137dab4b8a372",
+  "training_signature": "73ccac4228732b64d682bf1afe9e0d436edcc7f4abc92f3234bfd973e79cc6fd",
+  "software": {
+    "python": "3.14.5",
+    "torch": "2.12.1+cu130",
+    "cuda": "13.0",
+    "timm": "1.0.28",
+    "albumentations": "2.0.8",
+    "scikit_learn": "1.9.0",
+    "onnxruntime": "1.27.0"
+  },
+  "calibration": {
+    "method": "temperature_scaling",
+    "temperature": 0.05,
+    "fitted_on": "validation",
+    "validation_ece_before": 0.16298033900180178,
+    "validation_ece_after": 0.00012956604620726508
+  },
+  "onnx": {
+    "opset": 18,
+    "input_name": "images",
+    "output_name": "logits",
+    "parity": {
+      "passed": true,
+      "max_absolute_error": 2.5033950805664062e-06,
+      "max_calibrated_probability_error": 2.175569534301758e-06,
+      "atol": 0.0001,
+      "rtol": 0.001,
+      "tested_batch_sizes": [
+        1,
+        2
+      ],
+      "onnx_cpu_inference": {
+        "median_latency_ms": 29.81460001319647,
+        "mean_latency_ms": 30.249170000315644,
+        "p90_latency_ms": 32.04878000251483,
+        "images_per_second": 33.5406143150464,
+        "warmup_iterations": 10,
+        "iterations": 50
+      }
+    }
+  }
+}

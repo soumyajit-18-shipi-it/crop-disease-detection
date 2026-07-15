@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "release_name": "efficientnetv2_s_v1",
+  "architecture": "efficientnetv2_s",
+  "version": "v1",
+  "input": {
+    "width": 300,
+    "height": 300,
+    "channels": 3,
+    "color_space": "RGB"
+  },
+  "class_count": 15,
+  "onnx": {
+    "filename": "model.onnx",
+    "sha256": "bd0af61cba3bcc83a59d93348e6e43a539c6b60069203d7ee9d4ee746810beaa",
+    "size_bytes": 80679586
+  },
+  "metadata": {
+    "filename": "model.json",
+    "sha256": "96852b14f0314e72cee285703931890eb8c65e950e92bb12885f8644b0a43476",
+    "size_bytes": 8336
+  },
+  "metrics": {
+    "filename": "metrics.json",
+    "sha256": "f5a0366c0419d853bd0db5e9e696f39c2f4855163837656f72dae3efaabd5bf6",
+    "size_bytes": 17003
+  },
+  "checksum_filename": "checksum.sha256",
+  "minimum_backend_version": "1.0.0",
+  "download_url_environment_variable": "LEAFLIGHT_MODEL_URL",
+  "download_url": "https://github.com/soumyajit-18-shipi-it/crop-disease-detection/releases/download/model-efficientnetv2-s-v1/model.onnx",
+  "created_at": "2026-07-14T12:07:09.278860+00:00",
+  "validation_status": "passed",
+  "onnx_parity_status": "passed"
+}
