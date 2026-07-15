@@ -19,7 +19,9 @@ COPY --chown=leaflight:leaflight data/class_mapping.json ./data/class_mapping.js
 COPY --chown=leaflight:leaflight models/releases/efficientnetv2_s_v1 ./models/releases/efficientnetv2_s_v1
 
 RUN python scripts/download_model.py \
-    && python scripts/download_model.py --verify-only
+    && python scripts/download_model.py --verify-only \
+    && chown leaflight:leaflight models/releases/efficientnetv2_s_v1/model.onnx \
+    && chmod 0444 models/releases/efficientnetv2_s_v1/model.onnx
 
 EXPOSE 8000
 USER leaflight
