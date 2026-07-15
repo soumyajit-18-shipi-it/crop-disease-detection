@@ -8,20 +8,31 @@ function formatName(name = "") {
   return name.replaceAll("_", " ");
 }
 
-function statusLabel(status) {
-  if (status === "online") return "MODEL LIVE";
-  if (status === "degraded") return "MODEL DEGRADED";
+function statusLabel(status, modelHealth) {
+  if (modelHealth?.model_loaded === true) return "MODEL LIVE";
+  if (status === "degraded") return "MODEL UNAVAILABLE";
   if (status === "offline") return "OFFLINE";
   return "CHECKING";
 }
 
-function ScannerFrame({ previewUrl, backendStatus }) {
+function inputLabel(inputSize) {
+  const width = Number(inputSize?.width);
+  const height = Number(inputSize?.height);
+  const channels = Number(inputSize?.channels);
+  if (width > 0 && height > 0 && channels > 0) {
+    const color = channels === 3 ? "RGB" : `${channels}-channel`;
+    return `${width}×${height} ${color}`;
+  }
+  return "RGB image";
+}
+
+function ScannerFrame({ previewUrl, backendStatus, modelHealth }) {
   return (
     <div className="scanner-frame">
       <div className="scanner-topbar">
         <span className={`live-dot ${backendStatus}`}></span>
-        <span>{statusLabel(backendStatus)}</span>
-        <span>224 RGB</span>
+        <span>{statusLabel(backendStatus, modelHealth)}</span>
+        <span>{inputLabel(modelHealth?.input_size)}</span>
       </div>
       <div className="scanner-image-wrap">
         {previewUrl ? (
@@ -38,14 +49,14 @@ function ScannerFrame({ previewUrl, backendStatus }) {
   );
 }
 
-function PredictionResult({ result, previewUrl, isLoading, backendStatus }) {
+function PredictionResult({ result, previewUrl, isLoading, backendStatus, modelHealth }) {
   const [open, setOpen] = useState(false);
   const [feedbackStatus, setFeedbackStatus] = useState("");
 
   if (isLoading) {
     return (
       <section className="result-panel scanner-result">
-        <ScannerFrame previewUrl={previewUrl} backendStatus={backendStatus} />
+        <ScannerFrame previewUrl={previewUrl} backendStatus={backendStatus} modelHealth={modelHealth} />
         <div className="result-content">
           <p className="eyebrow"><span></span>Analysis running</p>
           <h2>Scanning visual symptoms</h2>
@@ -81,7 +92,7 @@ function PredictionResult({ result, previewUrl, isLoading, backendStatus }) {
 
   return (
     <section className="result-panel">
-      <ScannerFrame previewUrl={previewUrl} backendStatus={backendStatus} />
+      <ScannerFrame previewUrl={previewUrl} backendStatus={backendStatus} modelHealth={modelHealth} />
       <div className="result-content">
         <div className="result-meta-row">
           <p className="eyebrow"><span></span>{result.mode === "onnx" ? "Model prediction" : "Backend fallback"}</p>

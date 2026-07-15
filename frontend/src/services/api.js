@@ -54,6 +54,9 @@ export async function getHealth() {
     const response = await api.get("/health");
     return response.data;
   } catch (error) {
+    if (typeof error.response?.data?.model_loaded === "boolean") {
+      return error.response.data;
+    }
     throw normalizeError(error);
   }
 }

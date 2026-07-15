@@ -12,6 +12,7 @@ function Home() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const [backendStatus, setBackendStatus] = useState("checking");
+  const [modelHealth, setModelHealth] = useState(null);
 
   const previewUrl = useMemo(() => (selectedFile ? URL.createObjectURL(selectedFile) : ""), [selectedFile]);
 
@@ -20,9 +21,15 @@ function Home() {
     const checkBackend = async () => {
       try {
         const health = await getHealth();
-        if (mounted) setBackendStatus(health.status === "ok" ? "online" : "degraded");
+        if (mounted) {
+          setModelHealth(health);
+          setBackendStatus(health.status === "ok" ? "online" : "degraded");
+        }
       } catch {
-        if (mounted) setBackendStatus("offline");
+        if (mounted) {
+          setModelHealth(null);
+          setBackendStatus("offline");
+        }
       }
     };
     checkBackend();
@@ -52,7 +59,7 @@ function Home() {
     <div className="home-layout">
       <section className="section-heading">
         <p className="eyebrow"><span></span>Crop scanner</p>
-        <h1>Inspect a leaf image with field-ready model feedback.</h1>
+        <h1>Inspect a leaf image with model-assisted feedback.</h1>
         <p>Use natural light, keep the leaf flat, and center the symptomatic area for the clearest result.</p>
       </section>
 
@@ -65,6 +72,7 @@ function Home() {
           previewUrl={previewUrl}
           isLoading={isLoading}
           backendStatus={backendStatus}
+          modelHealth={modelHealth}
         />
         <ScanHistory refreshKey={historyRefreshKey} />
       </div>
