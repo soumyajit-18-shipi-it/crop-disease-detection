@@ -58,7 +58,7 @@ React + Vite <── HTTP ──> FastAPI + ONNX Runtime <──> SQLite disease
 - Persisted split: 20,638 PlantVillage images across 15 pepper, potato, and tomato classes.
 - Split counts: 14,447 train, 3,097 validation, and 3,094 test images (seed 42).
 - PlantDoc and field-survey sources are optional and were skipped in the current split manifest.
-- The completed Phase 2.5 EfficientNetV2-S run uses the same persisted split and is deployed as application release `v1`. Other candidate training remains separate and is not required to serve this release.
+- Phase 2.5 EfficientNetV2-S and ConvNeXt-Tiny are complete on the same persisted split. ConvNeXt-Base is not started, so the required three-candidate selection remains blocked and EfficientNetV2-S `v1` stays deployed.
 - See `docs/model_comparison.md`, `docs/training_results.md`, `docs/production_model.md`, and `docs/training_pipeline_audit.md` for measured status and engineering decisions without estimated metrics.
 
 ## Active Model Release
@@ -233,29 +233,30 @@ Open `http://127.0.0.1:8765`, review the grouped labels, and accept, replace, or
 
 ## Train, Benchmark, and Export
 
-Train or resume one configured architecture:
+Train or resume one configured architecture. ConvNeXt-Tiny completed by early stopping at epoch 21 with best epoch 13; the next required candidate is ConvNeXt-Base:
 
 ```powershell
-python -m src.training.train `
+.\.venv\Scripts\python.exe -m src.training.train `
   --config configs/training/phase2_5.yaml `
-  --architecture efficientnetv2_s
+  --architecture convnext_base
 ```
 
 Run or resume all missing candidates and regenerate comparison reports:
 
 ```powershell
-python -m src.training.benchmark --config configs/training/phase2_5.yaml --train
+.\.venv\Scripts\python.exe -m src.training.benchmark --config configs/training/phase2_5.yaml --train
 ```
 
 Each run writes to `artifacts/training/crop_disease_phase2_5/<architecture>/`, including:
 
 - `best.pt` and resumable `last.pt` checkpoints
 - `history.json`, `history.csv`, and `training_history.csv`
-- `metrics.json`, `classification_report.json`, and `classification_report.txt`
-- `confusion_matrix.png`, `calibration.json`, and `reliability_diagram.png`
-- `model.onnx` and `model.json` with ONNX parity/CPU benchmark metadata
+- `metrics.json`, `classification_report.json`/`.txt`, `evaluation_report.md`, and `per_class_metrics.csv`
+- `confusion_matrix.json`/`.png`, `misclassified_images.json`, and `confidence_distribution.json`
+- `calibration.json`, `evaluation_logits.npz`, and `reliability_diagram.png`
+- `model.onnx`, `model.json`, and `checksum.sha256` with multi-input ONNX parity metadata
 
-Future comparative benchmark runs remain opt-in training work. They do not alter the active `efficientnetv2_s_v1` application release unless a new parity-verified release bundle is explicitly deployed.
+Candidate work does not alter the active `efficientnetv2_s_v1` application release. Current measured results and the formally blocked selection are documented in `docs/model_comparison.md`; no partial winner was promoted.
 
 Swin-Tiny is supported as an optional candidate after the required three-model benchmark:
 
