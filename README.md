@@ -1,9 +1,13 @@
 # Leaflight — Crop Disease Detection
 
-Leaflight is a full-stack crop disease detection platform for analyzing plant leaf images. It combines a React dashboard, a FastAPI inference API, SQLite-backed disease guidance and scan history, and a reproducible PyTorch training pipeline with ONNX export.
+Leaflight is a full-stack crop disease detection platform for analyzing plant leaf images. It combines a React dashboard, a FastAPI inference API, PostgreSQL-backed user data and scan history, and a reproducible PyTorch training pipeline with ONNX export. Production uses Vercel, Render, and Supabase PostgreSQL; explicitly configured SQLite remains available only for local development and tests.
 
 > [!IMPORTANT]
 > The application actively serves the parity-verified EfficientNetV2-S `v1` release at `models/releases/efficientnetv2_s_v1/`. The 80.7 MB ONNX binary is intentionally excluded from Git; the small release manifest, metadata, metrics, and checksums are tracked. Run `python scripts/download_model.py` to obtain or verify the exact binary. If the release is missing or invalid, `/health` returns HTTP 503 with `model_loaded: false`, and prediction endpoints fail closed.
+
+Production frontend: `https://crop-disease.vercel.app`
+
+Production API: `https://crop-disease-api-xcz2.onrender.com`
 
 ## Latest Features
 
@@ -12,7 +16,7 @@ Leaflight is a full-stack crop disease detection platform for analyzing plant le
 - Drag-and-drop, file-picker, and rear-camera image capture for JPG, PNG, and WebP files up to 10 MB.
 - Leaf preview with analysis/loading states and periodic backend availability checks.
 - Top diagnosis, confidence score, low-confidence retake guidance, and expandable top-3 alternatives.
-- Crop, severity, symptoms, and recommended-treatment guidance from SQLite.
+- Crop, severity, symptoms, and recommended-treatment guidance from the configured database.
 - Helpful/not-helpful feedback logging.
 - Recent scan field log plus a dashboard with total scans, most-common diagnosis, average confidence, healthy/diseased ratio, disease-frequency chart, and timestamped history cards.
 - Responsive Dashboard, New scan, Scan history, and Profile views.
@@ -25,7 +29,7 @@ Leaflight is a full-stack crop disease detection platform for analyzing plant le
 - Strict server-side image validation, configurable upload limit, and SHA-256 image hashes.
 - Health, supported-class, disease-information, scan-history, and feedback endpoints.
 - Authenticated dashboard aggregation plus user-scoped prediction, history, and feedback endpoints.
-- Idempotent SQLite schema migrations and reviewed disease-data seeding at startup.
+- Supabase PostgreSQL migrations in production, explicit SQLite migrations for local tests, and reviewed disease-data seeding at startup.
 - CORS configuration and rotating request logs.
 - Interactive OpenAPI documentation at `http://127.0.0.1:8000/docs`.
 
@@ -53,7 +57,7 @@ Field survey (validated) ───┘                              │
                          metrics + ONNX parity/CPU benchmark + model selection
                                                           │
                                                           v
-React + Vite <── HTTP ──> FastAPI + ONNX Runtime <──> SQLite disease data/history
+React + Vite <── /api rewrite ──> FastAPI + ONNX Runtime <──> Supabase PostgreSQL
 ```
 
 ## Current Repository Status
@@ -99,7 +103,7 @@ These measurements come from the persisted Phase 2.5 evaluation artifacts. Valid
 | API | FastAPI, Uvicorn, Pydantic, Pillow |
 | Inference | ONNX Runtime, NumPy, OpenCV |
 | Training | PyTorch, torchvision, timm, Albumentations, scikit-learn |
-| Data/reporting | pandas, openpyxl, SQLite, Matplotlib |
+| Data/reporting | PostgreSQL, SQLite (local/test only), pandas, openpyxl, Matplotlib |
 | Testing | pytest, FastAPI TestClient |
 
 ## Quick Start
@@ -141,6 +145,7 @@ $env:APP_URL="http://127.0.0.1:5173"
 $env:OAUTH_CALLBACK_URL="http://127.0.0.1:8000/auth/google/callback"
 $env:CORS_ORIGINS="http://127.0.0.1:5173"
 $env:COOKIE_SECURE="false"
+$env:DATABASE_URL="sqlite:///backend/db/disease_info.db"
 ```
 
 Use `COOKIE_SECURE=true` with HTTPS in production. Full consent-screen, origin, redirect, cookie, and failure-mode setup is in [docs/authentication.md](docs/authentication.md). No Google access or refresh token is stored.
@@ -153,7 +158,10 @@ Backend configuration is read from environment variables:
 | `MODEL_METADATA_PATH` | `models/releases/efficientnetv2_s_v1/model.json` |
 | `MODEL_RELEASE_MANIFEST` | `models/releases/efficientnetv2_s_v1/release.json` |
 | `LEAFLIGHT_MODEL_URL` | optional override for the release manifest URL |
-| `DB_PATH` | `backend/db/disease_info.db` |
+| `ENVIRONMENT` | `development`; set `production` on Render |
+| `DATABASE_URL` | required; PostgreSQL in production or explicit `sqlite:///...` locally |
+| `DATABASE_POOL_MIN_SIZE` | `1` |
+| `DATABASE_POOL_MAX_SIZE` | `5` |
 | `CORS_ORIGINS` | `http://127.0.0.1:5173` |
 | `MAX_UPLOAD_SIZE_MB` | `10` |
 | `GOOGLE_CLIENT_ID` | required for sign-in |
@@ -192,7 +200,7 @@ The expected ONNX SHA-256 is `bd0af61cba3bcc83a59d93348e6e43a539c6b60069203d7ee9
   --reload --host 127.0.0.1 --port 8000
 ```
 
-Database setup and disease-data seeding happen automatically at startup.
+Local SQLite setup and disease-data seeding happen automatically at startup. Production schema changes are applied with the tracked Supabase migrations before deployment; production never falls back to SQLite.
 
 - Health: `http://127.0.0.1:8000/health`
 - API docs: `http://127.0.0.1:8000/docs`
@@ -209,17 +217,18 @@ Open `http://127.0.0.1:5173`.
 
 ## Docker deployment
 
-Docker uses a verified-local-model workflow. The URL is used only before the build and is never placed in a build argument or image layer:
+Docker obtains the immutable release asset through the checksum-gated downloader when it is absent, then verifies it again during the build. Credentials are never passed as build arguments or stored in image layers:
 
 ```powershell
-python scripts/download_model.py
-python scripts/download_model.py --verify-only
-docker build -f backend/Dockerfile -t leaflight-api:efficientnetv2-s-v1 .
-docker volume create leaflight-data
-docker run --rm -p 8000:8000 -e PORT=8000 -v leaflight-data:/data leaflight-api:efficientnetv2-s-v1
+docker build -t leaflight-api:efficientnetv2-s-v1 .
+docker run --rm -p 8000:8000 `
+  -e PORT=8000 `
+  -e ENVIRONMENT=production `
+  -e DATABASE_URL="<ssl-postgresql-url>" `
+  leaflight-api:efficientnetv2-s-v1
 ```
 
-The image verifies the release during build, runs as a non-root user, supports a platform-supplied `PORT`, has an HTTP health check, and stores SQLite at `/data/disease_info.db`. Keep `/data` mounted to persistent storage.
+The image verifies the release during build, runs as a non-root user, supports a platform-supplied `PORT`, and has an HTTP health check. Production persistence is Supabase PostgreSQL; no Render filesystem path is used as a database.
 
 ## API Endpoints
 
@@ -341,7 +350,7 @@ See `docs/deployment.md` for the complete clean-clone, Docker, troubleshooting, 
 - PlantVillage contains many lab-condition leaf photos; field performance can be lower under variable lighting, clutter, occlusion, or mixed symptoms.
 - Disease and treatment guidance is decision support, not a substitute for local agronomy advice.
 - The UI displays `MODEL LIVE` only when `/health` explicitly reports `model_loaded: true`.
-- A live Google sign-in cannot be verified without deployer-provided OAuth credentials; automated tests mock Google and exercise state, callback, session, expiry, ownership, and CSRF behavior without external requests.
+- Automated tests mock Google while exercising state, callback, session, expiry, ownership, and CSRF behavior; production verification additionally requires the exact Google origin and callback documented in `docs/deployment.md`.
 - Prediction endpoints intentionally fail closed when a complete ONNX bundle is unavailable.
 - The reported metrics describe the held-out Phase 2.5 split and should not be generalized to unconstrained field conditions.
 

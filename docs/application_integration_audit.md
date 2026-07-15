@@ -13,7 +13,7 @@
 ## Implemented resolution
 
 - The application exposes only working Dashboard, New scan, Scan history, Profile, feedback, and logout controls.
-- All statistics, charts, recent scans, confidence summaries, and history records come from authenticated SQLite queries through `/dashboard` and `/history`.
+- All statistics, charts, recent scans, confidence summaries, and history records come from authenticated database queries through `/dashboard` and `/history`.
 - Empty accounts render empty states; failed requests render errors; pending requests render loading states. No record or prediction is generated in the browser.
 - Predictions, batch predictions, history, dashboard data, and feedback are protected and scoped by `user_id`.
 - Google OAuth profiles populate `users`; opaque sessions and OAuth state are stored separately. Google tokens are not stored.

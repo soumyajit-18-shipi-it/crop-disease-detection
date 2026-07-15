@@ -18,7 +18,8 @@ COPY --chown=leaflight:leaflight scripts/download_model.py ./scripts/download_mo
 COPY --chown=leaflight:leaflight data/class_mapping.json ./data/class_mapping.json
 COPY --chown=leaflight:leaflight models/releases/efficientnetv2_s_v1 ./models/releases/efficientnetv2_s_v1
 
-RUN python scripts/download_model.py --verify-only
+RUN python scripts/download_model.py \
+    && python scripts/download_model.py --verify-only
 
 EXPOSE 8000
 USER leaflight

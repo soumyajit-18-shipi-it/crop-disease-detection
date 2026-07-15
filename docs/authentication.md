@@ -1,6 +1,6 @@
 # Google authentication setup
 
-Leaflight uses Google's OAuth 2.0 authorization-code flow in the FastAPI backend. The backend exchanges the one-time code, reads the verified OpenID Connect profile, discards the Google access token, and creates an opaque server-side session. The browser receives an `HttpOnly` session cookie plus a separate CSRF cookie. Session tokens and CSRF tokens are HMAC-hashed in SQLite; raw tokens are never stored.
+Leaflight uses Google's OAuth 2.0 authorization-code flow in the FastAPI backend. The backend exchanges the one-time code, reads the verified OpenID Connect profile, discards the Google access token, and creates an opaque server-side session. The browser receives an `HttpOnly` session cookie plus a separate CSRF cookie. Session tokens and CSRF tokens are HMAC-hashed in the configured database; raw tokens are never stored.
 
 ## Google Cloud configuration
 
@@ -20,10 +20,11 @@ Leaflight uses Google's OAuth 2.0 authorization-code flow in the FastAPI backend
    http://127.0.0.1:8000/auth/google/callback
    ```
 
-7. For production, add the deployed frontend origin and the exact HTTPS callback. For example, if the API is `https://api.example.com`, register:
+7. For production, add this exact origin and callback:
 
    ```text
-   https://api.example.com/auth/google/callback
+   Authorized JavaScript origin: https://crop-disease.vercel.app
+   Authorized redirect URI: https://crop-disease.vercel.app/api/auth/google/callback
    ```
 
 The callback scheme, host, port, path, case, and trailing slash must match `OAUTH_CALLBACK_URL` exactly. Do not add wildcards. Keep the downloaded client configuration and client secret outside the repository.
@@ -61,7 +62,7 @@ npm.cmd --prefix frontend run dev -- --host 127.0.0.1 --port 5173
 
 ## Production environment
 
-Set all local variables above to their deployed HTTPS values, leave `COOKIE_SECURE=true`, and restrict `CORS_ORIGINS` to exact trusted frontend origins. Prefer frontend and API hosts under the same registrable domain (for example, `app.example.com` and `api.example.com`) so browser privacy controls do not treat the session as a third-party cookie. Mount the SQLite database path on persistent storage.
+Production uses Vercel's same-origin `/api` rewrite to Render. Set `APP_URL` and `CORS_ORIGINS` to `https://crop-disease.vercel.app`, set `OAUTH_CALLBACK_URL` to `https://crop-disease.vercel.app/api/auth/google/callback`, leave `COOKIE_SECURE=true` and `COOKIE_SAMESITE=lax`, and leave `COOKIE_DOMAIN` unset. Render uses an SSL Supabase PostgreSQL `DATABASE_URL`; it never uses SQLite or Render's ephemeral filesystem for persistence.
 
 Sessions expire after `SESSION_TTL_HOURS` (168 hours by default). Logout revokes the database session immediately. Expired, revoked, missing, or altered cookies produce HTTP 401. State-changing routes additionally require the matching `X-CSRF-Token` header; a mismatched token produces HTTP 403.
 
@@ -74,4 +75,4 @@ Sessions expire after `SESSION_TTL_HOURS` (168 hours by default). Logout revokes
 - Duplicate email with a different Google subject: the callback does not silently link accounts and returns to the login screen with an account error.
 - Google or database failure: the callback creates no session and returns to the login screen with a retryable provider error.
 
-Tests mock Google's token and user-info responses; they never contact Google. A live Google login remains the one manual verification that requires valid project credentials.
+Tests mock Google's token and user-info responses; they never contact Google. Production must additionally be verified with a live callback through the exact registered Vercel URL.

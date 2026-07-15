@@ -69,6 +69,10 @@ async def request_logger(request: Request, call_next):
     response.headers.setdefault("X-Frame-Options", "DENY")
     response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
     response.headers.setdefault("Permissions-Policy", "camera=(self)")
+    if request.url.path.startswith(
+        ("/auth", "/dashboard", "/history", "/predict", "/feedback")
+    ):
+        response.headers.setdefault("Cache-Control", "no-store")
     duration_ms = (time.perf_counter() - start) * 1000
     logging.info(
         "method=%s path=%s status=%s duration_ms=%.2f",
