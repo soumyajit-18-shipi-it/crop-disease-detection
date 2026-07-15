@@ -1,0 +1,11 @@
+{
+  "mcp": {
+    "servers": {
+      "glab": {
+        "command": "glab",
+        "args": ["mcp", "serve"],
+        "env": {}
+      }
+    }
+  }
+}
