@@ -26,7 +26,7 @@ def configure_logging() -> None:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     configure_logging()
-    seed_database()
+    seed_database(settings.db_path)
     load_model()
     yield
 

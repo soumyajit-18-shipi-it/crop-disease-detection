@@ -72,10 +72,11 @@ def _infer_crop_and_disease(class_name: str) -> tuple[str, str]:
     return crop, disease
 
 
-def seed_database() -> None:
-    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+def seed_database(db_path: str | Path | None = None) -> None:
+    target_path = Path(db_path).resolve() if db_path is not None else DB_PATH
+    target_path.parent.mkdir(parents=True, exist_ok=True)
     classes = _load_classes()
-    with sqlite3.connect(DB_PATH) as conn:
+    with sqlite3.connect(target_path) as conn:
         conn.execute("DROP TABLE IF EXISTS diseases")
         conn.execute(
             """

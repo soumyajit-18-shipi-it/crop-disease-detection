@@ -8,6 +8,12 @@ class TopPrediction(BaseModel):
     confidence: float
 
 
+class ModelInputSize(BaseModel):
+    width: int
+    height: int
+    channels: int
+
+
 class PredictionResponse(BaseModel):
     class_name: str
     confidence: float
@@ -17,8 +23,11 @@ class PredictionResponse(BaseModel):
     symptoms: str
     recommended_treatment: str
     severity_level: str | None = None
-    mode: str = "mock"
-    mock: bool = True
+    mode: str = "onnx"
+    mock: bool = False
+    model_name: str | None = None
+    model_version: str | None = None
+    input_size: ModelInputSize | None = None
 
 
 class DiseaseInfo(BaseModel):
@@ -35,6 +44,9 @@ class HealthResponse(BaseModel):
     model_loaded: bool
     model_mode: str
     db_connected: bool
+    model_name: str | None = None
+    model_version: str | None = None
+    input_size: ModelInputSize | None = None
 
 
 class ScanHistoryItem(BaseModel):

@@ -49,8 +49,11 @@ def _enrich_prediction(prediction: dict, image_hash: str) -> PredictionResponse:
         symptoms=disease["symptoms"],
         recommended_treatment=disease["recommended_treatment"],
         severity_level=disease.get("severity_level"),
-        mode=prediction.get("mode", "mock"),
-        mock=bool(prediction.get("mock", prediction.get("mode") != "onnx")),
+        mode=prediction.get("mode", "onnx"),
+        mock=bool(prediction.get("mock", False)),
+        model_name=prediction.get("model_name"),
+        model_version=prediction.get("model_version"),
+        input_size=prediction.get("input_size"),
     )
 
 
@@ -74,6 +77,9 @@ async def predict_batch(files: list[UploadFile] = File(...)) -> list[PredictionR
     for file in files:
         content = await file.read()
         image = _validate_upload(content, file.content_type)
-        prediction = model_service.predict(image)
+        try:
+            prediction = model_service.predict(image)
+        except ModelUnavailableError as exc:
+            raise HTTPException(status_code=503, detail="The inference model is not available.") from exc
         responses.append(_enrich_prediction(prediction, hashlib.sha256(content).hexdigest()))
     return responses

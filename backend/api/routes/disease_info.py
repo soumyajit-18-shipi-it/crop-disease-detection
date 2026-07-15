@@ -10,11 +10,10 @@ from backend.api.schemas import DiseaseInfo
 
 
 router = APIRouter(tags=["disease-info"])
-DB_PATH = Path(settings.db_path)
 
 
-def db_connect(path: Path = DB_PATH) -> sqlite3.Connection:
-    conn = sqlite3.connect(path)
+def db_connect(path: str | Path | None = None) -> sqlite3.Connection:
+    conn = sqlite3.connect(Path(path) if path is not None else settings.db_path)
     conn.row_factory = sqlite3.Row
     return conn
 
