@@ -20,7 +20,7 @@ def _softmax(values: np.ndarray) -> np.ndarray:
 
 def load_model(checkpoint_path: str | Path, device: str | None = None):
     device = device or ("cuda" if torch.cuda.is_available() else "cpu")
-    checkpoint = torch.load(checkpoint_path, map_location=device)
+    checkpoint = torch.load(checkpoint_path, map_location=device, weights_only=False)
     metadata = checkpoint["metadata"]
     architecture = metadata["architecture"]
     num_classes = metadata["num_classes"]
@@ -34,8 +34,9 @@ def load_model(checkpoint_path: str | Path, device: str | None = None):
 def predict(model, image, metadata: dict, device: str | None = None) -> dict:
     device = device or next(model.parameters()).device
     image_size = int(metadata.get("image_size", 224))
-    tensor = preprocess_for_model(image, image_size).to(device)
-    logits = model(tensor)
+    tensor = preprocess_for_model(image, image_size, metadata.get("preprocessing")).to(device)
+    temperature = float(metadata.get("calibration", {}).get("temperature", 1.0))
+    logits = model(tensor) / temperature
     probabilities = torch.softmax(logits, dim=1)[0].cpu().numpy()
     idx_to_class = {int(k): v for k, v in metadata["idx_to_class"].items()}
     top_indices = probabilities.argsort()[-3:][::-1]
@@ -61,12 +62,15 @@ def export_to_onnx(checkpoint_path: str | Path, output_path: str | Path = "model
         output_names=["logits"],
         dynamic_axes={"input": {0: "batch"}, "logits": {0: "batch"}},
         opset_version=17,
+        dynamo=False,
     )
     json_metadata = {
         "architecture": metadata["architecture"],
         "num_classes": metadata["num_classes"],
         "image_size": metadata.get("image_size", 224),
         "idx_to_class": metadata["idx_to_class"],
+        "preprocessing": metadata.get("preprocessing"),
+        "calibration": metadata.get("calibration", {"temperature": 1.0}),
     }
     with output.with_suffix(".json").open("w", encoding="utf-8") as file:
         json.dump(json_metadata, file, indent=2)
@@ -78,8 +82,9 @@ def verify_onnx(checkpoint_path: str | Path, onnx_path: str | Path, image) -> bo
 
     model, metadata = load_model(checkpoint_path, "cpu")
     model.eval()
-    torch_input = preprocess_for_model(image, int(metadata.get("image_size", 224)))
-    onnx_input = preprocess_for_onnx(image, int(metadata.get("image_size", 224)))
+    preprocessing = metadata.get("preprocessing")
+    torch_input = preprocess_for_model(image, int(metadata.get("image_size", 224)), preprocessing)
+    onnx_input = preprocess_for_onnx(image, int(metadata.get("image_size", 224)), preprocessing)
     with torch.no_grad():
         torch_logits = model(torch_input).numpy()
     session = ort.InferenceSession(str(onnx_path), providers=["CPUExecutionProvider"])

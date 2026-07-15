@@ -5,6 +5,7 @@
 1. Build from the repository root using `backend/Dockerfile`.
 2. Set environment variables:
    - `MODEL_PATH=models/onnx/model.onnx`
+   - `MODEL_METADATA_PATH=models/onnx/model.json`
    - `DB_PATH=backend/db/disease_info.db`
    - `CORS_ORIGINS=https://your-frontend.vercel.app`
    - `MAX_UPLOAD_SIZE_MB=10`
@@ -34,12 +35,12 @@ dist
 
 ## Swapping in a Retrained Model
 
-1. Train and evaluate a new checkpoint.
-2. Export it to ONNX:
+1. Complete the Phase 2.5 benchmark and production selection:
 
-```bash
-python -m src.inference.predict --checkpoint models/checkpoints/best_model.pth --output models/onnx/model.onnx
+```powershell
+.\.venv\Scripts\python.exe -m src.training.benchmark --config configs/training/phase2_5.yaml --train
 ```
 
-3. Deploy the backend artifact containing the new ONNX file and metadata JSON.
+2. Deploy `artifacts/training/crop_disease_phase2_5/production/best.onnx` and `metadata.json` together. Set `MODEL_PATH` and `MODEL_METADATA_PATH` to those deployed paths.
+3. Verify `/health` reports `model_loaded: true`, then run a known-image smoke test. The metadata carries backbone-specific preprocessing and the fitted calibration temperature; do not pair the ONNX file with metadata from another run.
 4. The frontend does not need redeployment if the API contract remains unchanged.

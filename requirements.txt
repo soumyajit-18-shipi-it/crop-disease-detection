@@ -4,9 +4,9 @@ timm
 albumentations
 opencv-python
 scikit-learn
-grad-cam
 numpy
 pandas
+openpyxl
 matplotlib
 Pillow
 pytest

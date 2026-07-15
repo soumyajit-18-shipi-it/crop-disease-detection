@@ -3,103 +3,100 @@ from __future__ import annotations
 import json
 import logging
 import os
-import random
 from pathlib import Path
 
 import numpy as np
 from PIL import Image
 
+from src.inference.preprocess_input import preprocess_for_onnx
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-CLASS_MAPPING_PATH = PROJECT_ROOT / "data" / "class_mapping.json"
 DEFAULT_ONNX_PATH = PROJECT_ROOT / "models" / "onnx" / "model.onnx"
-DEFAULT_METADATA_PATH = PROJECT_ROOT / "models" / "model_config.json"
-
 logger = logging.getLogger(__name__)
+
+
+class ModelUnavailableError(RuntimeError):
+    pass
 
 
 class ModelService:
     def __init__(self) -> None:
-        self.mode = "mock"
         self.session = None
-        self.input_name = "input"
+        self.input_name = "images"
+        self.output_name = "logits"
         self.image_size = 224
-        self.idx_to_class = self._load_idx_to_class()
-
-    def _load_idx_to_class(self) -> dict[int, str]:
-        if not CLASS_MAPPING_PATH.exists():
-            return {0: "Unknown"}
-        with CLASS_MAPPING_PATH.open("r", encoding="utf-8") as file:
-            payload = json.load(file)
-        if "idx_to_class" in payload:
-            return {int(k): str(v) for k, v in payload["idx_to_class"].items()}
-        return {int(k): str(v) for k, v in payload.items()}
+        self.preprocessing: dict = {}
+        self.temperature = 1.0
+        self.idx_to_class: dict[int, str] = {}
+        self.model_path: Path | None = None
+        self.load_error: str | None = None
 
     def load(self) -> None:
-        model_path = Path(os.getenv("MODEL_PATH", str(DEFAULT_ONNX_PATH)))
-        if not model_path.exists():
-            logger.warning("No ONNX model found at %s. API will run in mock prediction mode.", model_path)
-            self.mode = "mock"
+        model_path = Path(os.getenv("MODEL_PATH", str(DEFAULT_ONNX_PATH))).resolve()
+        metadata_override = os.getenv("MODEL_METADATA_PATH")
+        if metadata_override:
+            metadata_path = Path(metadata_override).resolve()
+        else:
+            candidates = [model_path.with_suffix(".json"), model_path.parent / "metadata.json"]
+            metadata_path = next((path for path in candidates if path.is_file()), candidates[0]).resolve()
+        self.session = None
+        self.load_error = None
+        self.preprocessing = {}
+        self.temperature = 1.0
+        self.idx_to_class = {}
+        self.model_path = None
+        if not model_path.is_file() or not metadata_path.is_file():
+            self.load_error = f"ONNX model bundle is incomplete: {model_path} and {metadata_path} are required"
+            logger.error(self.load_error)
             return
         try:
             import onnxruntime as ort
-
-            self.session = ort.InferenceSession(str(model_path), providers=["CPUExecutionProvider"])
+            metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+            mapping = metadata.get("idx_to_class", {})
+            if not mapping:
+                raise ValueError("Model metadata has no idx_to_class mapping")
+            providers = ["CUDAExecutionProvider", "CPUExecutionProvider"]
+            available = set(ort.get_available_providers())
+            selected = [provider for provider in providers if provider in available]
+            self.session = ort.InferenceSession(str(model_path), providers=selected)
             self.input_name = self.session.get_inputs()[0].name
-            metadata_path = model_path.with_suffix(".json")
-            if metadata_path.exists():
-                with metadata_path.open("r", encoding="utf-8") as file:
-                    metadata = json.load(file)
-                self.idx_to_class = {int(k): str(v) for k, v in metadata.get("idx_to_class", {}).items()} or self.idx_to_class
-                self.image_size = int(metadata.get("image_size", self.image_size))
-            self.mode = "onnx"
-            logger.info("Loaded ONNX model from %s", model_path)
+            self.output_name = self.session.get_outputs()[0].name
+            self.idx_to_class = {int(index): str(label) for index, label in mapping.items()}
+            self.image_size = int(metadata["image_size"])
+            self.preprocessing = metadata.get("preprocessing", {})
+            self.temperature = float(metadata.get("calibration", {}).get("temperature", 1.0))
+            if not np.isfinite(self.temperature) or self.temperature <= 0:
+                raise ValueError("Model metadata has an invalid calibration temperature")
+            self.model_path = model_path
+            logger.info("Loaded ONNX model %s with providers %s", model_path, self.session.get_providers())
         except Exception as exc:
-            logger.warning("Failed to load ONNX model; falling back to mock mode: %s", exc)
-            self.mode = "mock"
             self.session = None
+            self.load_error = f"Failed to load ONNX model: {exc}"
+            logger.exception(self.load_error)
 
     @property
     def loaded(self) -> bool:
-        return self.mode == "onnx" and self.session is not None
+        return self.session is not None
 
-    def _preprocess(self, image: Image.Image) -> np.ndarray:
-        image = image.convert("RGB").resize((self.image_size, self.image_size))
-        arr = np.asarray(image).astype(np.float32) / 255.0
-        mean = np.array([0.485, 0.456, 0.406], dtype=np.float32)
-        std = np.array([0.229, 0.224, 0.225], dtype=np.float32)
-        arr = (arr - mean) / std
-        arr = np.transpose(arr, (2, 0, 1))[None, ...]
-        return arr.astype(np.float32)
+    @property
+    def mode(self) -> str:
+        return "onnx" if self.loaded else "unavailable"
 
     def predict(self, image: Image.Image) -> dict:
         if not self.loaded:
-            return self.mock_predict()
-        logits = self.session.run(None, {self.input_name: self._preprocess(image)})[0]
-        probs = self._softmax(logits)[0]
-        top_indices = probs.argsort()[-3:][::-1]
-        top_3 = [
-            {"class_name": self.idx_to_class.get(int(idx), f"class_{idx}"), "confidence": float(probs[idx])}
-            for idx in top_indices
+            raise ModelUnavailableError(self.load_error or "ONNX model is not loaded")
+        model_input = preprocess_for_onnx(image, self.image_size, self.preprocessing)
+        logits = self.session.run([self.output_name], {self.input_name: model_input})[0]
+        probabilities = self._softmax(logits / self.temperature)[0]
+        top_indices = probabilities.argsort()[-min(3, len(probabilities)):][::-1]
+        top = [
+            {"class_name": self.idx_to_class[int(index)], "confidence": float(probabilities[index])}
+            for index in top_indices
         ]
         return {
-            "class_name": top_3[0]["class_name"],
-            "confidence": top_3[0]["confidence"],
-            "top_3_predictions": top_3,
-            "mode": self.mode,
+            "class_name": top[0]["class_name"], "confidence": top[0]["confidence"],
+            "top_3_predictions": top, "mode": "onnx", "mock": False,
         }
-
-    def mock_predict(self) -> dict:
-        class_name = random.choice(list(self.idx_to_class.values()))
-        confidence = round(random.uniform(0.55, 0.82), 4)
-        alternatives = random.sample(list(self.idx_to_class.values()), min(3, len(self.idx_to_class)))
-        if class_name not in alternatives:
-            alternatives[0] = class_name
-        top_3 = [
-            {"class_name": name, "confidence": max(0.01, round(confidence - (i * 0.12), 4))}
-            for i, name in enumerate(alternatives)
-        ]
-        return {"class_name": class_name, "confidence": confidence, "top_3_predictions": top_3, "mode": "mock"}
 
     @staticmethod
     def _softmax(values: np.ndarray) -> np.ndarray:
@@ -116,8 +113,4 @@ def load_model() -> None:
 
 
 def get_supported_classes() -> list[str]:
-    return [model_service.idx_to_class[idx] for idx in sorted(model_service.idx_to_class)]
-
-
-def mock_predict(image_bytes: bytes | None = None, filename: str | None = None) -> dict:
-    return model_service.mock_predict()
+    return [model_service.idx_to_class[index] for index in sorted(model_service.idx_to_class)]

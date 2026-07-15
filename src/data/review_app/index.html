@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Field Survey Review</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <header>
+    <div><p class="eyebrow">Phase 0.8</p><h1>Field Survey Review</h1></div>
+    <label class="reviewer">Reviewer <input id="reviewer" autocomplete="name" placeholder="Your name"></label>
+  </header>
+  <section class="metrics" aria-label="Review progress">
+    <div><strong id="pending">-</strong><span>Pending groups</span></div>
+    <div><strong id="validated">-</strong><span>Validated records</span></div>
+    <div><strong id="rejected">-</strong><span>Rejected groups</span></div>
+    <div><strong id="total">-</strong><span>Total records</span></div>
+  </section>
+  <nav class="toolbar" aria-label="Queue controls">
+    <div class="segments" role="group" aria-label="Decision status">
+      <button class="active" data-status="pending">Pending</button>
+      <button data-status="accept">Accepted</button>
+      <button data-status="replace">Replaced</button>
+      <button data-status="reject">Rejected</button>
+      <button data-status="all">All</button>
+    </div>
+    <input id="search" type="search" placeholder="Search crop or disease" aria-label="Search crop or disease">
+  </nav>
+  <main>
+    <div class="queue-heading"><p id="position">Loading queue...</p><div><button id="previous" title="Previous group" aria-label="Previous group">&#8592;</button><button id="next" title="Next group" aria-label="Next group">&#8594;</button></div></div>
+    <article id="review-card" hidden>
+      <section class="image-panel"><div id="images" class="images"></div></section>
+      <section class="detail-panel">
+        <div class="flags" id="reasons"></div>
+        <dl>
+          <div><dt>Crop</dt><dd id="crop"></dd></div>
+          <div><dt>Original disease</dt><dd id="original"></dd></div>
+          <div><dt>Suggested disease</dt><dd id="suggested"></dd></div>
+          <div><dt>Confidence</dt><dd id="confidence"></dd></div>
+          <div><dt>Symptoms</dt><dd id="symptoms"></dd></div>
+        </dl>
+        <label>Canonical replacement
+          <input id="replacement" list="canonical-labels" placeholder="Enter canonical disease">
+          <datalist id="canonical-labels"></datalist>
+        </label>
+        <label>Review note <textarea id="note" rows="2" placeholder="Optional rationale"></textarea></label>
+        <div class="actions">
+          <button id="reject" class="danger">Reject suggestion</button>
+          <button id="replace">Replace label</button>
+          <button id="accept" class="primary">Accept suggestion</button>
+        </div>
+        <p id="decision-state" class="decision-state"></p>
+      </section>
+    </article>
+    <div id="empty" class="empty" hidden><h2>Queue complete</h2><p>No groups match this view.</p></div>
+  </main>
+  <div id="toast" role="status" aria-live="polite"></div>
+  <script src="/app.js"></script>
+</body>
+</html>

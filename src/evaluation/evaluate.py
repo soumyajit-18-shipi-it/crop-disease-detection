@@ -2,20 +2,23 @@ from __future__ import annotations
 
 import argparse
 from collections import Counter
+import json
 from pathlib import Path
 
 import torch
 
 from src.data.dataset import get_dataloaders
+from src.data.multisource_dataset import create_dataloaders
+from src.evaluation.calibration import softmax_probabilities
 from src.evaluation.metrics import compute_metrics, plot_confusion_matrix
 from src.models.baseline_cnn import BaselineCNN
 from src.models.model_factory import build_model
-from src.training.config import detect_device
-from src.training.engine import validate
+from src.training.config import config_from_dict, detect_device
+from src.training.engine import run_epoch
 
 
 def _load_checkpoint(path: str | Path, device: str):
-    checkpoint = torch.load(path, map_location=device)
+    checkpoint = torch.load(path, map_location=device, weights_only=False)
     metadata = checkpoint["metadata"]
     architecture = metadata["architecture"]
     num_classes = metadata["num_classes"]
@@ -28,18 +31,37 @@ def _load_checkpoint(path: str | Path, device: str):
 def evaluate(checkpoint_path: str = "models/checkpoints/best_model.pth") -> Path:
     device = detect_device()
     model, metadata = _load_checkpoint(checkpoint_path, device)
-    config = metadata["config"]
-    _, _, test_loader = get_dataloaders(
-        batch_size=config["batch_size"],
-        num_workers=config["num_workers"],
-        data_dir=config["data_dir"],
-        mapping_path=config["mapping_path"],
-        image_size=config["image_size"],
-    )
+    config_payload = metadata["config"]
+    if "data" in config_payload:
+        config = config_from_dict(config_payload)
+        config.runtime.device = device
+        manifest_path = Path(metadata.get("split_manifest", config.data.split_manifest))
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        test_loader = create_dataloaders(
+            config,
+            manifest=manifest,
+            preprocessing=metadata.get("preprocessing"),
+        )[0]["test"]
+    else:
+        _, _, test_loader = get_dataloaders(
+            batch_size=config_payload["batch_size"],
+            num_workers=config_payload["num_workers"],
+            data_dir=config_payload["data_dir"],
+            mapping_path=config_payload["mapping_path"],
+            image_size=config_payload["image_size"],
+        )
     criterion = torch.nn.CrossEntropyLoss()
-    test_loss, test_acc, y_pred, y_true = validate(model, test_loader, criterion, device)
+    result = run_epoch(model, test_loader, criterion, device)
+    test_loss = result["loss"]
+    test_acc = result["accuracy"]
+    y_pred = result["predictions"]
+    y_true = result["targets"]
     class_names = [metadata["idx_to_class"][str(i)] for i in range(metadata["num_classes"])]
-    metrics = compute_metrics(y_true, y_pred, class_names)
+    probabilities = softmax_probabilities(
+        result["logits"],
+        float(metadata.get("calibration", {}).get("temperature", 1.0)),
+    )
+    metrics = compute_metrics(y_true, y_pred, class_names, probabilities)
     matrix_path = plot_confusion_matrix(y_true, y_pred, class_names)
 
     confused = Counter((t, p) for t, p in zip(y_true, y_pred) if t != p)

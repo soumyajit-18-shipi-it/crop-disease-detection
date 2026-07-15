@@ -1,0 +1,57 @@
+experiment_name: crop_disease_phase1
+
+data:
+  sources:
+    - name: plantvillage
+      type: pre_split_image_folder
+      path: data/processed
+    - name: plantdoc
+      type: recursive_image_folder
+      path: data/raw/PlantDoc
+      optional: true
+    - name: field_survey
+      type: validated_manifest
+      path: data/manifests/field_survey/validated_manifest.json
+      optional: true
+      enabled: true
+  split_manifest: data/splits/phase1_split.json
+  train_ratio: 0.70
+  val_ratio: 0.15
+  test_ratio: 0.15
+  image_size: 224
+  batch_size: 32
+  num_workers: 0
+
+model:
+  architecture: efficientnetv2_s
+  architectures: [efficientnetv2_s, convnext_tiny, convnext_base]
+  pretrained: true
+  dropout: 0.2
+  architecture_overrides:
+    efficientnetv2_s: {batch_size: 16, gradient_accumulation_steps: 2}
+    convnext_tiny: {batch_size: 8, gradient_accumulation_steps: 4}
+    convnext_base: {batch_size: 2, gradient_accumulation_steps: 16}
+
+optimization:
+  learning_rate: 0.0003
+  weight_decay: 0.01
+  epochs: 30
+  warmup_epochs: 3
+  label_smoothing: 0.1
+  class_weighting: true
+  gradient_clip_norm: 1.0
+  gradient_accumulation_steps: 1
+
+runtime:
+  seed: 42
+  device: auto
+  mixed_precision: true
+  deterministic: true
+  ema_decay: 0.9999
+  early_stopping_patience: 7
+
+output:
+  run_root: artifacts/training
+  onnx_opset: 18
+  parity_atol: 0.0001
+  parity_rtol: 0.001

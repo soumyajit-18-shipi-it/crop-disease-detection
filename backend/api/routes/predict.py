@@ -4,9 +4,9 @@ import hashlib
 from io import BytesIO
 
 from fastapi import APIRouter, File, HTTPException, UploadFile
-from PIL import Image, UnidentifiedImageError
+from PIL import Image, ImageOps, UnidentifiedImageError
 
-from backend.api.model_loader import model_service
+from backend.api.model_loader import ModelUnavailableError, model_service
 from backend.api.routes.disease_info import db_connect, get_disease_info_by_class
 from backend.api.schemas import PredictionResponse
 from backend.config import settings
@@ -23,7 +23,7 @@ def _validate_upload(content: bytes, content_type: str | None) -> Image.Image:
     try:
         image = Image.open(BytesIO(content))
         image.verify()
-        return Image.open(BytesIO(content)).convert("RGB")
+        return ImageOps.exif_transpose(Image.open(BytesIO(content))).convert("RGB")
     except (UnidentifiedImageError, OSError) as exc:
         raise HTTPException(status_code=400, detail="Uploaded file is not a readable image.") from exc
 
@@ -50,6 +50,7 @@ def _enrich_prediction(prediction: dict, image_hash: str) -> PredictionResponse:
         recommended_treatment=disease["recommended_treatment"],
         severity_level=disease.get("severity_level"),
         mode=prediction.get("mode", "mock"),
+        mock=bool(prediction.get("mock", prediction.get("mode") != "onnx")),
     )
 
 
@@ -57,7 +58,10 @@ def _enrich_prediction(prediction: dict, image_hash: str) -> PredictionResponse:
 async def predict(file: UploadFile = File(...)) -> PredictionResponse:
     content = await file.read()
     image = _validate_upload(content, file.content_type)
-    prediction = model_service.predict(image)
+    try:
+        prediction = model_service.predict(image)
+    except ModelUnavailableError as exc:
+        raise HTTPException(status_code=503, detail="The inference model is not available.") from exc
     image_hash = hashlib.sha256(content).hexdigest()
     return _enrich_prediction(prediction, image_hash)
 

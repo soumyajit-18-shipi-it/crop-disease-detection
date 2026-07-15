@@ -1,0 +1,151 @@
+experiment_name: crop_disease_phase2_5
+
+data:
+  sources:
+    - name: plantvillage
+      type: pre_split_image_folder
+      path: data/processed
+    - name: plantdoc
+      type: recursive_image_folder
+      path: data/raw/PlantDoc
+      optional: true
+    - name: field_survey
+      type: validated_manifest
+      path: data/manifests/field_survey/validated_manifest.json
+      optional: true
+      enabled: true
+  # Phase 2.5 deliberately reuses this immutable manifest. Do not force-rebuild
+  # it during candidate comparison.
+  split_manifest: data/splits/phase1_split.json
+  train_ratio: 0.70
+  val_ratio: 0.15
+  test_ratio: 0.15
+  image_size: null
+  use_model_preprocessing: true
+  batch_size: 8
+  # Windows spawn workers each reserve a large scientific-Python runtime.
+  # Two single-threaded workers stay below the four-worker pagefile failure on
+  # the 16 GB benchmark host while keeping the GPU supplied with augmented data.
+  # This preserves the dataset, sampling policy, and optimization contract.
+  num_workers: 2
+  pin_memory: true
+  persistent_workers: false
+  prefetch_factor: 2
+  class_balanced_sampling: false
+  sampler_replacement: true
+
+augmentation:
+  enabled: true
+  random_resized_crop_scale: [0.72, 1.0]
+  random_resized_crop_ratio: [0.80, 1.25]
+  horizontal_flip_probability: 0.5
+  vertical_flip_probability: 0.2
+  geometry_probability: 0.45
+  shift_limit: 0.06
+  scale_limit: 0.12
+  rotate_limit: 25
+  perspective_scale: 0.05
+  color_probability: 0.60
+  brightness_contrast_weight: 1.0
+  clahe_weight: 0.35
+  hue_saturation_value_weight: 0.55
+  rgb_shift_weight: 0.25
+  gamma_weight: 0.45
+  blur_probability: 0.16
+  motion_blur_weight: 0.35
+  gaussian_blur_weight: 0.40
+  defocus_weight: 0.25
+  weather_probability: 0.10
+  shadow_weight: 1.0
+  fog_weight: 0.18
+  rain_weight: 0.0
+  compression_probability: 0.14
+  jpeg_quality_min: 65
+  coarse_dropout_probability: 0.12
+  coarse_dropout_holes: [1, 4]
+  coarse_dropout_size: [0.03, 0.12]
+  mixup_alpha: 0.2
+  mixup_probability: 0.15
+  cutmix_alpha: 1.0
+  cutmix_probability: 0.15
+
+model:
+  architecture: efficientnetv2_s
+  architectures: [efficientnetv2_s, convnext_tiny, convnext_base]
+  optional_architectures: [swin_tiny]
+  pretrained: true
+  dropout: 0.2
+  drop_path_rate: 0.1
+  architecture_overrides:
+    efficientnetv2_s:
+      batch_size: 12
+      gradient_accumulation_steps: 3
+      learning_rate: 0.0002
+    convnext_tiny:
+      batch_size: 8
+      gradient_accumulation_steps: 4
+      learning_rate: 0.0002
+      layer_decay: 0.8
+    convnext_base:
+      batch_size: 2
+      gradient_accumulation_steps: 16
+      learning_rate: 0.0001
+      layer_decay: 0.8
+    swin_tiny:
+      batch_size: 4
+      gradient_accumulation_steps: 8
+      learning_rate: 0.0001
+      layer_decay: 0.8
+
+optimization:
+  optimizer: adamw
+  learning_rate: 0.0002
+  weight_decay: 0.02
+  betas: [0.9, 0.999]
+  eps: 0.00000001
+  filter_bias_and_norm_from_weight_decay: true
+  layer_decay: null
+  epochs: 40
+  warmup_epochs: 3
+  warmup_start_factor: 0.01
+  min_learning_rate: 0.000001
+  label_smoothing: 0.1
+  class_weighting: true
+  class_weight_strategy: effective_num
+  effective_num_beta: 0.9999
+  gradient_clip_norm: 1.0
+  gradient_accumulation_steps: 1
+
+runtime:
+  seed: 42
+  device: auto
+  mixed_precision: true
+  amp_dtype: float16
+  deterministic: true
+  deterministic_warn_only: true
+  ema_enabled: true
+  ema_decay: 0.9999
+  early_stopping_patience: 8
+  early_stopping_monitor: macro_f1
+  early_stopping_mode: max
+  early_stopping_min_delta: 0.0001
+
+evaluation:
+  calibration_bins: 15
+  temperature_max_iterations: 75
+  latency_warmup_iterations: 10
+  latency_iterations: 50
+
+selection:
+  validation_macro_f1_weight: 0.40
+  calibration_weight: 0.20
+  inference_speed_weight: 0.15
+  model_size_weight: 0.15
+  memory_weight: 0.10
+  require_all_candidates: true
+
+output:
+  run_root: artifacts/training
+  onnx_opset: 18
+  parity_atol: 0.0001
+  parity_rtol: 0.001
