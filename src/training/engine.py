@@ -150,6 +150,9 @@ def run_epoch(
     targets: list[int] = []
     all_logits: list[list[float]] = []
     mix_counts = Counter()
+    optimizer_steps = 0
+    skipped_optimizer_steps = 0
+    maximum_gradient_norm = 0.0
     accumulation_steps = max(int(gradient_accumulation_steps), 1)
     num_batches = len(dataloader)
     context = torch.enable_grad if training else torch.no_grad
@@ -170,6 +173,10 @@ def run_epoch(
             with _autocast(device, mixed_precision, amp_dtype):
                 logits = model(images)
                 loss = lam * criterion(logits, labels_a) + (1.0 - lam) * criterion(logits, labels_b)
+            if not bool(torch.isfinite(loss.detach()).all()):
+                raise FloatingPointError(
+                    f"Non-finite loss detected at batch {batch_index + 1}/{num_batches}"
+                )
             if training:
                 group_start = (batch_index // accumulation_steps) * accumulation_steps
                 group_size = min(accumulation_steps, num_batches - group_start)
@@ -182,24 +189,42 @@ def run_epoch(
                 if should_step:
                     if scaler is not None and scaler.is_enabled():
                         scaler.unscale_(optimizer)
+                    gradients_finite = True
                     if gradient_clip_norm > 0:
-                        torch.nn.utils.clip_grad_norm_(model.parameters(), gradient_clip_norm)
+                        gradient_norm = torch.nn.utils.clip_grad_norm_(
+                            model.parameters(),
+                            gradient_clip_norm,
+                            error_if_nonfinite=False,
+                        )
+                        gradients_finite = bool(torch.isfinite(gradient_norm.detach()).item())
+                        if gradients_finite:
+                            maximum_gradient_norm = max(
+                                maximum_gradient_norm, float(gradient_norm.detach().item())
+                            )
                     optimizer_updated = True
                     if scaler is not None and scaler.is_enabled():
+                        # GradScaler's unscale_ records non-finite gradients;
+                        # step() then safely skips the update and update()
+                        # lowers the scale. Scheduler and EMA must not advance.
                         scale_before = scaler.get_scale()
                         scaler.step(optimizer)
                         scaler.update()
-                        optimizer_updated = scaler.get_scale() >= scale_before
+                        optimizer_updated = gradients_finite and scaler.get_scale() >= scale_before
+                    elif not gradients_finite:
+                        optimizer_updated = False
                     else:
                         optimizer.step()
                     optimizer.zero_grad(set_to_none=True)
                     # AMP can skip optimizer.step on overflow. Advancing LR/EMA
                     # in that case both triggers warnings and desynchronizes state.
                     if optimizer_updated:
+                        optimizer_steps += 1
                         if scheduler is not None:
                             scheduler.step()
                         if ema is not None:
                             ema.update(model)
+                    else:
+                        skipped_optimizer_steps += 1
             predicted = logits.argmax(1)
             total_loss += float(loss.detach().item()) * labels.size(0)
             correct += lam * float((predicted == labels_a).sum().item())
@@ -222,4 +247,7 @@ def run_epoch(
         "logits": all_logits,
         "probabilities": probabilities,
         "batch_augmentation_counts": dict(mix_counts),
+        "optimizer_steps": optimizer_steps,
+        "skipped_optimizer_steps": skipped_optimizer_steps,
+        "maximum_gradient_norm": maximum_gradient_norm if training else None,
     }
