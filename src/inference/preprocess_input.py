@@ -88,8 +88,8 @@ def preprocess_rgb_array(
     """Canonical eval/inference preprocessing.
 
     Input is RGB. Output is a float32 array shaped (1, 3, H, W), normalized
-    with ImageNet statistics. Training/evaluation and ONNX serving both use
-    this function for non-augmented preprocessing.
+    with the supplied model metadata. Training/evaluation and ONNX serving
+    both use this function for non-augmented preprocessing.
     """
     contract = resolve_preprocessing_contract(image_size, preprocessing)
     image_np = image_to_rgb_array(image)
