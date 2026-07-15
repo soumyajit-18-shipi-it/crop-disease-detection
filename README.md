@@ -3,7 +3,7 @@
 Leaflight is a full-stack crop disease detection platform for analyzing plant leaf images. It combines a React dashboard, a FastAPI inference API, SQLite-backed disease guidance and scan history, and a reproducible PyTorch training pipeline with ONNX export.
 
 > [!IMPORTANT]
-> The application and API run locally today, but real predictions require both `models/onnx/model.onnx` and `models/onnx/model.json`. If that bundle is missing, `/health` reports `model_loaded: false`, the model mode is `unavailable`, and prediction endpoints return HTTP 503. No production model or benchmark result is claimed until all candidate runs finish and pass ONNX parity checks.
+> The application actively serves the parity-verified EfficientNetV2-S `v1` release at `models/releases/efficientnetv2_s_v1/`. The 80.7 MB ONNX binary is intentionally excluded from Git; the small release manifest, metadata, metrics, and checksums are tracked. Run `python scripts/download_model.py` to obtain or verify the exact binary. If the release is missing or invalid, `/health` returns HTTP 503 with `model_loaded: false`, and prediction endpoints fail closed.
 
 ## Latest Features
 
@@ -58,8 +58,25 @@ React + Vite <── HTTP ──> FastAPI + ONNX Runtime <──> SQLite disease
 - Persisted split: 20,638 PlantVillage images across 15 pepper, potato, and tomato classes.
 - Split counts: 14,447 train, 3,097 validation, and 3,094 test images (seed 42).
 - PlantDoc and field-survey sources are optional and were skipped in the current split manifest.
-- Phase 2.5 uses the same persisted split and a separate `crop_disease_phase2_5` experiment directory. No accuracy/F1 value is reported until its on-disk candidate artifact is complete.
+- The completed Phase 2.5 EfficientNetV2-S run uses the same persisted split and is deployed as application release `v1`. Other candidate training remains separate and is not required to serve this release.
 - See `docs/model_comparison.md`, `docs/training_results.md`, `docs/production_model.md`, and `docs/training_pipeline_audit.md` for measured status and engineering decisions without estimated metrics.
+
+## Active Model Release
+
+| Field | Value |
+|---|---|
+| Architecture | EfficientNetV2-S (`efficientnetv2_s`) |
+| Release version | `v1` |
+| Input | 300×300 RGB, NCHW float32 |
+| Test accuracy | 0.998707 (99.8707%) |
+| Test macro F1 | 0.998905 |
+| Calibrated test ECE | 0.001292 (0.1292%) |
+| ONNX CPU median latency | 29.815 ms/image |
+| ONNX SHA-256 | `bd0af61cba3bcc83a59d93348e6e43a539c6b60069203d7ee9d4ee746810beaa` |
+| Model path | `models/releases/efficientnetv2_s_v1/model.onnx` |
+| Metadata path | `models/releases/efficientnetv2_s_v1/model.json` |
+
+These measurements come from the persisted Phase 2.5 evaluation artifacts. Validation is still dominated by PlantVillage-style imagery; this model is decision support, not a replacement for an agricultural expert or a claim of field readiness.
 
 ## Screenshots
 
@@ -86,18 +103,16 @@ React + Vite <── HTTP ──> FastAPI + ONNX Runtime <──> SQLite disease
 
 Run all commands from the repository root unless a section says otherwise.
 
-### 1. Install dependencies
+### 1. Install inference dependencies
 
 ```powershell
 python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-python -m pip install -r requirements.txt
-python -m pip install -r backend/requirements.txt
+.\.venv\Scripts\python.exe -m pip install -r backend/requirements.txt
 
 npm.cmd --prefix frontend install
 ```
 
-Vite requires Node.js 18 or newer.
+The inference environment is pinned for Python 3.11 and excludes the CUDA/PyTorch training stack. Contributors running backend tests should install `backend/requirements-dev.txt`; training work still uses the separate root `requirements.txt`. Vite requires Node.js 18 or newer.
 
 ### 2. Configure the services
 
@@ -111,25 +126,32 @@ Backend configuration is read from environment variables:
 
 | Variable | Default |
 |---|---|
-| `MODEL_PATH` | `models/onnx/model.onnx` |
-| `MODEL_METADATA_PATH` | sibling `model.json` file |
+| `MODEL_PATH` | `models/releases/efficientnetv2_s_v1/model.onnx` |
+| `MODEL_METADATA_PATH` | `models/releases/efficientnetv2_s_v1/model.json` |
+| `MODEL_RELEASE_MANIFEST` | `models/releases/efficientnetv2_s_v1/release.json` |
+| `LEAFLIGHT_MODEL_URL` | optional override for the release manifest URL |
 | `DB_PATH` | `backend/db/disease_info.db` |
 | `CORS_ORIGINS` | `http://localhost:5173,http://127.0.0.1:5173` |
 | `MAX_UPLOAD_SIZE_MB` | `10` |
 
 The included `.env.example` files are references; export the variables in your shell because the application does not auto-load `.env` files.
 
-### 3. Prepare an ONNX bundle for predictions
+### 3. Download and verify the model release
 
-If you have the legacy checkpoint at `models/checkpoints/best_model.pth`, export it with:
+The active manifest points to the immutable GitHub Release asset at `model-efficientnetv2-s-v1`. Download it with the checksum-gated setup command:
 
 ```powershell
-.\.venv\Scripts\python.exe -m src.inference.predict `
-  --checkpoint models/checkpoints/best_model.pth `
-  --output models/onnx/model.onnx
+.\.venv\Scripts\python.exe scripts/download_model.py
+
+# Optional mirror or one-time URL override
+$env:LEAFLIGHT_MODEL_URL="<alternate-versioned-model-url>"
+.\.venv\Scripts\python.exe scripts/download_model.py --url "<alternate-versioned-model-url>"
+
+# Verify an existing bundle without network access
+.\.venv\Scripts\python.exe scripts/download_model.py --verify-only
 ```
 
-This writes both `model.onnx` and `model.json`. The newer production training workflow creates parity-verified bundles under `artifacts/training/`; point `MODEL_PATH` and `MODEL_METADATA_PATH` at the selected ONNX and metadata files when serving one of those bundles.
+The expected ONNX SHA-256 is `bd0af61cba3bcc83a59d93348e6e43a539c6b60069203d7ee9d4ee746810beaa`. A valid existing file is reused. Downloads use timeouts, a manifest size limit, streaming SHA-256, temporary storage, and an atomic final move.
 
 ### 4. Run the backend
 
@@ -152,6 +174,20 @@ npm.cmd --prefix frontend run dev -- --host 127.0.0.1 --port 5173
 ```
 
 Open `http://127.0.0.1:5173`.
+
+## Docker deployment
+
+Docker uses a verified-local-model workflow. The URL is used only before the build and is never placed in a build argument or image layer:
+
+```powershell
+python scripts/download_model.py
+python scripts/download_model.py --verify-only
+docker build -f backend/Dockerfile -t leaflight-api:efficientnetv2-s-v1 .
+docker volume create leaflight-data
+docker run --rm -p 8000:8000 -e PORT=8000 -v leaflight-data:/data leaflight-api:efficientnetv2-s-v1
+```
+
+The image verifies the release during build, runs as a non-root user, supports a platform-supplied `PORT`, has an HTTP health check, and stores SQLite at `/data/disease_info.db`. Keep `/data` mounted to persistent storage.
 
 ## API Endpoints
 
@@ -219,7 +255,7 @@ Each run writes to `artifacts/training/crop_disease_phase2_5/<architecture>/`, i
 - `confusion_matrix.png`, `calibration.json`, and `reliability_diagram.png`
 - `model.onnx` and `model.json` with ONNX parity/CPU benchmark metadata
 
-The benchmark promotes a model only after all configured candidates finish on one split hash and pass the required checks. The production directory contains `best.pt`, `best.onnx`, `metadata.json`, `metrics.json`, `training_history.csv`, `confusion_matrix.png`, `classification_report.json`, and `calibration.json` plus a checksummed bundle manifest.
+Future comparative benchmark runs remain opt-in training work. They do not alter the active `efficientnetv2_s_v1` application release unless a new parity-verified release bundle is explicitly deployed.
 
 Swin-Tiny is supported as an optional candidate after the required three-model benchmark:
 
@@ -232,16 +268,39 @@ See `docs/future_model_roadmap.md` for the intentionally unimplemented dataset, 
 ## Tests
 
 ```powershell
-.\.venv\Scripts\python.exe -m pytest
+.\.venv\Scripts\python.exe -m pip install -r backend/requirements-dev.txt
+.\.venv\Scripts\python.exe -m pytest tests -q
+.\.venv\Scripts\python.exe -m pytest backend/tests -q
 npm.cmd --prefix frontend run build
+python scripts/verify_clean_clone.py
 ```
+
+The clean-clone simulation uses a temporary loopback HTTP server serving the already verified local ONNX file. It is an end-to-end test of the download and real API workflow, not a test of a public remote release.
+
+## Release troubleshooting and publishing
+
+- Missing model: run `python scripts/download_model.py`; configure `LEAFLIGHT_MODEL_URL` or pass `--url` only when using an alternate mirror.
+- Checksum mismatch: correct the published asset or selected version; never edit the ONNX bytes or bypass verification.
+- Wrong version: keep `MODEL_PATH`, `MODEL_METADATA_PATH`, and `MODEL_RELEASE_MANIFEST` in the same versioned directory.
+- Download failure: check network/TLS/access configuration and timeout options. Keep credentials outside Git and out of model URLs.
+- Metadata mismatch: restore the tracked files for that release; never combine artifacts from different exports.
+
+To publish a new release, create a new versioned directory, calculate exact SHA-256 hashes and sizes, commit only `model.json`, `metrics.json`, `checksum.sha256`, and `release.json`, and upload `model.onnx` to an immutable artifact URL. Then configure and verify it with:
+
+```powershell
+$env:LEAFLIGHT_MODEL_URL="<real-versioned-model-url>"
+python scripts/download_model.py --release <release-name>
+python scripts/download_model.py --release <release-name> --verify-only
+```
+
+See `docs/deployment.md` for the complete clean-clone, Docker, troubleshooting, and release-publishing procedure.
 
 ## Known Limitations
 
 - PlantVillage contains many lab-condition leaf photos; field performance can be lower under variable lighting, clutter, occlusion, or mixed symptoms.
 - Disease and treatment guidance is decision support, not a substitute for local agronomy advice.
-- The current UI backend indicator reflects API availability; confirm `model_loaded` from `/health` before presenting the model as ready.
+- The UI displays `MODEL LIVE` only when `/health` explicitly reports `model_loaded: true`.
 - Prediction endpoints intentionally fail closed when a complete ONNX bundle is unavailable.
-- No model accuracy or F1 claim is made until the benchmark artifacts contain completed measurements.
+- The reported metrics describe the held-out Phase 2.5 split and should not be generalized to unconstrained field conditions.
 
 See `docs/deployment.md` for deployment notes.

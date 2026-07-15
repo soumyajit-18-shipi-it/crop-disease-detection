@@ -6,7 +6,7 @@
 - PyTorch: `2.12.1+cu130`; CUDA available: `true`
 - GPU: NVIDIA GeForce RTX 3050 6GB Laptop GPU, 6.0 GB VRAM.
 - Persisted split: `data/splits/phase1_split.json`
-- Production selection: pending
+- Active application release: EfficientNetV2-S `v1`
 
 ## Pipeline Audit and Implemented Policy
 
@@ -22,15 +22,22 @@
 
 ### efficientnetv2_s
 
-- Status: not started
+- Status: completed, evaluated, ONNX parity passed, and deployed as application release `v1`
+- Input: 300×300 RGB
+- Test accuracy: 0.9987071752
+- Test macro F1: 0.9989051608
+- Calibrated test ECE: 0.0012922681
+- Calibration temperature: 0.05
+- ONNX CPU median latency: 29.8146 ms/image
+- ONNX SHA-256: `bd0af61cba3bcc83a59d93348e6e43a539c6b60069203d7ee9d4ee746810beaa`
 
 ### convnext_tiny
 
-- Status: not started
+- Status: no completed evaluated release is documented here
 
 ### convnext_base
 
-- Status: not started
+- Status: no completed evaluated release is documented here
 
 ## Run or Resume Exactly
 
