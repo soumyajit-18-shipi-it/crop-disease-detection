@@ -14,9 +14,18 @@ backend/logs/
 # Data and model artifacts
 data/raw/
 data/processed/
+data/manifests/field_survey/
 models/checkpoints/*.pth
 models/checkpoints/*.pt
 models/checkpoints/*.ckpt
+artifacts/
+models/
+wandb/
+mlruns/
+docs/model_performance_report.md
+docs/confusion_matrix.png
+docs/training_curves.png
+docs/training_logs/
 
 # Node
 node_modules/
