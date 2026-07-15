@@ -16,4 +16,8 @@ def test_onnx_export_has_metadata_and_parity(tmp_path):
     metadata = json.loads(output.with_suffix(".json").read_text(encoding="utf-8"))
     assert output.exists()
     assert report["passed"] is True
+    assert report["mean_absolute_error"] >= 0
+    assert report["top1_class_match"] is True
+    assert report["top3_class_order_match"] is True
+    assert report["onnx_cpu_inference"]["p95_latency_ms"] >= 0
     assert metadata["onnx"]["parity"]["passed"] is True

@@ -7,7 +7,7 @@ from src.evaluation.calibration import calibration_metrics, fit_temperature, sof
 from src.inference.preprocess_input import preprocess_rgb_array
 from src.training.benchmark import _select_best
 from src.training.config import load_config
-from src.training.engine import apply_batch_augmentation, build_class_weights
+from src.training.engine import apply_batch_augmentation, build_class_weights, run_epoch
 
 
 class _Dataset:
@@ -51,6 +51,7 @@ def test_temperature_scaling_never_returns_worse_validation_nll():
     before = calibration_metrics(targets, softmax_probabilities(logits))
     after = calibration_metrics(targets, softmax_probabilities(logits, fitted["temperature"]))
     assert fitted["temperature"] > 0
+    assert isinstance(fitted["boundary_reached"], bool)
     assert after["negative_log_likelihood"] <= before["negative_log_likelihood"] + 1e-9
 
 
@@ -87,3 +88,28 @@ def test_selection_uses_memory_as_the_required_fifth_component():
     selected, scores = _select_best({"lower_memory": metrics(100), "higher_memory": metrics(200)})
     assert selected == "lower_memory"
     assert scores["lower_memory"] > scores["higher_memory"]
+
+
+def test_nonfinite_gradient_is_skipped_without_poisoning_weights(monkeypatch):
+    model = torch.nn.Linear(2, 2)
+    optimizer = torch.optim.SGD(model.parameters(), lr=0.1)
+    before = {name: value.detach().clone() for name, value in model.state_dict().items()}
+    monkeypatch.setattr(
+        torch.nn.utils,
+        "clip_grad_norm_",
+        lambda *_args, **_kwargs: torch.tensor(float("inf")),
+    )
+
+    result = run_epoch(
+        model,
+        [(torch.ones(2, 2), torch.tensor([0, 1]))],
+        torch.nn.CrossEntropyLoss(),
+        "cpu",
+        optimizer=optimizer,
+        gradient_clip_norm=1.0,
+    )
+
+    assert result["optimizer_steps"] == 0
+    assert result["skipped_optimizer_steps"] == 1
+    for name, value in model.state_dict().items():
+        assert torch.equal(value, before[name])

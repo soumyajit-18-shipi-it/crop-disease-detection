@@ -101,6 +101,13 @@ def fit_temperature(logits, y_true, max_iterations: int = 75) -> dict:
         temperature = 1.0
         after_nll = before_nll
         status = "fallback_identity"
+    lower_bound = 0.05
+    upper_bound = 20.0
+    boundary_tolerance = 1e-6
+    boundary_reached = bool(
+        temperature <= lower_bound + boundary_tolerance
+        or temperature >= upper_bound - boundary_tolerance
+    )
     return {
         "method": "temperature_scaling",
         "temperature": temperature,
@@ -110,6 +117,13 @@ def fit_temperature(logits, y_true, max_iterations: int = 75) -> dict:
         "nll_after": after_nll,
         "fitted_samples": int(targets.numel()),
         "max_iterations": int(max_iterations),
+        "bounds": [lower_bound, upper_bound],
+        "boundary_reached": boundary_reached,
+        "warning": (
+            "Temperature optimization reached a configured boundary; calibration should be reviewed."
+            if boundary_reached
+            else None
+        ),
     }
 
 

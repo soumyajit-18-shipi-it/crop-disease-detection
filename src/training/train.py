@@ -25,7 +25,7 @@ import onnxruntime
 import sklearn
 import timm
 import torch
-from sklearn.metrics import classification_report, f1_score
+from sklearn.metrics import classification_report, confusion_matrix, f1_score, precision_score, recall_score
 from timm.optim import create_optimizer_v2
 from torch.optim.lr_scheduler import LambdaLR
 
@@ -239,6 +239,7 @@ def _latency(
         "median_latency_ms": median_ms,
         "mean_latency_ms": statistics.mean(timings),
         "p90_latency_ms": float(np.percentile(timings, 90)),
+        "p95_latency_ms": float(np.percentile(timings, 95)),
         "images_per_second": 1000.0 / median_ms,
         "batch_size": 1,
         "warmup_iterations": warmup_iterations,
@@ -325,10 +326,11 @@ def _write_history(run_dir: Path, history: list[dict]) -> None:
     _atomic_json(run_dir / "history.json", history)
     if not history:
         return
+    fieldnames = list(dict.fromkeys(key for row in history for key in row))
     for filename in ("history.csv", "training_history.csv"):
         temporary = run_dir / f"{filename}.tmp"
         with temporary.open("w", newline="", encoding="utf-8") as file:
-            writer = csv.DictWriter(file, fieldnames=list(history[0]))
+            writer = csv.DictWriter(file, fieldnames=fieldnames)
             writer.writeheader()
             writer.writerows(history)
         os.replace(temporary, run_dir / filename)
@@ -403,6 +405,15 @@ def _finalize_run(
         "validation_ece_before": calibration_report["validation"]["before"]["expected_calibration_error"],
         "validation_ece_after": calibration_report["validation"]["after"]["expected_calibration_error"],
     }
+    metadata.update(
+        {
+            "candidate_version": f"phase2_5_{architecture}_v1",
+            "input_dimensions": [None, 3, metadata["image_size"], metadata["image_size"]],
+            "channel_count": 3,
+            "ordered_classes": class_names,
+            "source_checkpoint_epoch": int(best_epoch),
+        }
+    )
 
     metrics = compute_metrics(
         test_result["targets"],
@@ -458,6 +469,14 @@ def _finalize_run(
         model, "cpu", metadata["image_size"], warmups, iterations
     )
     _atomic_json(run_dir / "calibration.json", calibration_report)
+    np.savez_compressed(
+        run_dir / "evaluation_logits.npz",
+        validation_logits=np.asarray(validation_result["logits"], dtype=np.float32),
+        validation_targets=np.asarray(validation_result["targets"], dtype=np.int64),
+        test_logits=np.asarray(test_result["logits"], dtype=np.float32),
+        test_targets=np.asarray(test_result["targets"], dtype=np.int64),
+        temperature=np.asarray([temperature], dtype=np.float64),
+    )
     _atomic_json(
         run_dir / "classification_report.json",
         classification_report(
@@ -482,6 +501,77 @@ def _finalize_run(
     plot_confusion_matrix(
         test_result["targets"], test_result["predictions"], class_names, run_dir / "confusion_matrix.png"
     )
+    _atomic_json(
+        run_dir / "confusion_matrix.json",
+        {
+            "class_names": class_names,
+            "matrix": confusion_matrix(
+                test_result["targets"],
+                test_result["predictions"],
+                labels=list(range(metadata["num_classes"])),
+            ).tolist(),
+        },
+    )
+    confidence_rows = []
+    raw_confidence = np.max(test_raw_probabilities, axis=1)
+    calibrated_confidence = np.max(test_probabilities, axis=1)
+    for lower in np.linspace(0.0, 0.9, 10):
+        upper = lower + 0.1
+        confidence_rows.append(
+            {
+                "lower": float(lower),
+                "upper": float(upper),
+                "raw_count": int(((raw_confidence >= lower) & (raw_confidence <= upper)).sum()),
+                "calibrated_count": int(
+                    ((calibrated_confidence >= lower) & (calibrated_confidence <= upper)).sum()
+                ),
+            }
+        )
+    _atomic_json(
+        run_dir / "confidence_distribution.json",
+        {
+            "samples": len(test_result["targets"]),
+            "raw": {
+                "minimum": float(raw_confidence.min()),
+                "median": float(np.median(raw_confidence)),
+                "mean": float(raw_confidence.mean()),
+                "maximum": float(raw_confidence.max()),
+            },
+            "calibrated": {
+                "minimum": float(calibrated_confidence.min()),
+                "median": float(np.median(calibrated_confidence)),
+                "mean": float(calibrated_confidence.mean()),
+                "maximum": float(calibrated_confidence.max()),
+            },
+            "histogram": confidence_rows,
+        },
+    )
+    test_samples = getattr(loaders["test"].dataset, "samples", [])
+    misclassified = []
+    for index, (target, prediction) in enumerate(
+        zip(test_result["targets"], test_result["predictions"])
+    ):
+        if target == prediction:
+            continue
+        probabilities = test_probabilities[index]
+        top3 = np.argsort(probabilities)[::-1][:3]
+        path = str(test_samples[index][0]) if index < len(test_samples) else None
+        misclassified.append(
+            {
+                "index": index,
+                "path": path,
+                "true_index": int(target),
+                "true_class": class_names[target],
+                "predicted_index": int(prediction),
+                "predicted_class": class_names[prediction],
+                "confidence": float(probabilities[prediction]),
+                "top3": [
+                    {"class": class_names[int(item)], "probability": float(probabilities[item])}
+                    for item in top3
+                ],
+            }
+        )
+    _atomic_json(run_dir / "misclassified_images.json", misclassified)
     plot_reliability_diagram(
         test_result["targets"],
         test_result["logits"],
@@ -500,8 +590,39 @@ def _finalize_run(
         best_epoch,
         {"validation_macro_f1": validation_metrics["macro"]["f1"]},
     )
+    source_checkpoint_sha256 = hashlib.sha256(best_path.read_bytes()).hexdigest()
+    metadata["source_checkpoint_sha256"] = source_checkpoint_sha256
     metrics["checkpoint_size_bytes"] = best_path.stat().st_size
+    metrics["source_checkpoint_sha256"] = source_checkpoint_sha256
+    per_class_path = run_dir / "per_class_metrics.csv"
+    with per_class_path.open("w", newline="", encoding="utf-8") as file:
+        writer = csv.DictWriter(
+            file, fieldnames=["class", "precision", "recall", "f1", "support", "roc_auc"]
+        )
+        writer.writeheader()
+        for class_name, values in metrics["per_class"].items():
+            writer.writerow({"class": class_name, **values})
+    report_lines = [
+        f"# {architecture} Final Evaluation",
+        "",
+        f"- Best epoch: {best_epoch}",
+        f"- Test loss: {metrics['test_loss']:.10f}",
+        f"- Accuracy: {metrics['accuracy']:.10f}",
+        f"- Balanced accuracy: {metrics['balanced_accuracy']:.10f}",
+        f"- Macro precision: {metrics['macro']['precision']:.10f}",
+        f"- Macro recall: {metrics['macro']['recall']:.10f}",
+        f"- Macro F1: {metrics['macro']['f1']:.10f}",
+        f"- Macro ROC-AUC: {metrics.get('roc_auc_ovr_macro')}",
+        f"- Test ECE before calibration: {calibration_report['test']['before']['expected_calibration_error']:.10f}",
+        f"- Test ECE after calibration: {calibration_report['test']['after']['expected_calibration_error']:.10f}",
+        f"- Temperature: {temperature:.10f}",
+        f"- Misclassified images: {len(misclassified)}",
+    ]
+    (run_dir / "evaluation_report.md").write_text("\n".join(report_lines) + "\n", encoding="utf-8")
     _atomic_json(run_dir / "metrics.json", metrics)
+    parity_samples = []
+    held_out_images, _held_out_labels = next(iter(loaders["val"]))
+    parity_samples.append(("validation_held_out", held_out_images[:2].detach().cpu()))
     parity = export_and_verify_onnx(
         model,
         run_dir / "model.onnx",
@@ -512,9 +633,14 @@ def _finalize_run(
         config.output.parity_rtol,
         warmups,
         iterations,
+        parity_samples=parity_samples,
     )
     metrics["onnx_parity"] = parity
     metrics["onnx_size_bytes"] = (run_dir / "model.onnx").stat().st_size
+    metrics["onnx_sha256"] = hashlib.sha256((run_dir / "model.onnx").read_bytes()).hexdigest()
+    (run_dir / "checksum.sha256").write_text(
+        f"{metrics['onnx_sha256']}  model.onnx\n", encoding="ascii"
+    )
     _atomic_json(run_dir / "metrics.json", metrics)
     _atomic_json(
         run_dir / "run_state.json",
@@ -522,6 +648,13 @@ def _finalize_run(
             "status": "complete",
             "architecture": architecture,
             "best_epoch": best_epoch,
+            "last_completed_epoch": int(history[-1]["epoch"]),
+            "stopping_reason": (
+                "early_stopping"
+                if int(history[-1]["epoch"]) < config.optimization.epochs
+                else "epoch_limit"
+            ),
+            "early_stopping_patience": config.runtime.early_stopping_patience,
             "completed_at": _utc_now(),
         },
     )
@@ -654,6 +787,18 @@ def _train_architecture(
         if state.get("scaler_state_dict"):
             scaler.load_state_dict(state["scaler_state_dict"])
         history = state.get("history", [])
+        historical_fields = (
+            "val_macro_precision",
+            "val_macro_recall",
+            "epoch_duration_seconds",
+            "epoch_peak_gpu_memory_bytes",
+            "maximum_gradient_norm",
+            "optimizer_steps",
+            "skipped_optimizer_steps",
+        )
+        for historical_row in history:
+            for field in historical_fields:
+                historical_row.setdefault(field, None)
         best_score = float(state.get("best_score", best_score))
         best_epoch = int(state.get("best_epoch", 0))
         bad_epochs = int(state.get("bad_epochs", 0))
@@ -681,6 +826,9 @@ def _train_architecture(
         torch.cuda.reset_peak_memory_stats()
     wall_start = time.perf_counter()
     for epoch in range(start_epoch, config.optimization.epochs + 1):
+        epoch_start = time.perf_counter()
+        if device.startswith("cuda"):
+            torch.cuda.reset_peak_memory_stats()
         train_result = run_epoch(
             model,
             loaders["train"],
@@ -708,6 +856,28 @@ def _train_architecture(
                 zero_division=0,
             )
         )
+        validation_macro_precision = float(
+            precision_score(
+                validation_result["targets"],
+                validation_result["predictions"],
+                labels=list(range(num_classes)),
+                average="macro",
+                zero_division=0,
+            )
+        )
+        validation_macro_recall = float(
+            recall_score(
+                validation_result["targets"],
+                validation_result["predictions"],
+                labels=list(range(num_classes)),
+                average="macro",
+                zero_division=0,
+            )
+        )
+        epoch_duration = time.perf_counter() - epoch_start
+        epoch_peak_gpu_memory = (
+            int(torch.cuda.max_memory_allocated()) if device.startswith("cuda") else None
+        )
         row = {
             "epoch": epoch,
             "train_loss": train_result["loss"],
@@ -715,10 +885,17 @@ def _train_architecture(
             "val_loss": validation_result["loss"],
             "val_accuracy": validation_result["accuracy"],
             "val_macro_f1": validation_macro_f1,
+            "val_macro_precision": validation_macro_precision,
+            "val_macro_recall": validation_macro_recall,
             "monitor_value": monitor_value,
             "learning_rate": optimizer.param_groups[0]["lr"],
             "mixup_batches": train_result["batch_augmentation_counts"].get("mixup", 0),
             "cutmix_batches": train_result["batch_augmentation_counts"].get("cutmix", 0),
+            "epoch_duration_seconds": epoch_duration,
+            "epoch_peak_gpu_memory_bytes": epoch_peak_gpu_memory,
+            "maximum_gradient_norm": train_result["maximum_gradient_norm"],
+            "optimizer_steps": train_result["optimizer_steps"],
+            "skipped_optimizer_steps": train_result["skipped_optimizer_steps"],
         }
         history.append(row)
         improved = _is_improved(config, monitor_value, best_score)
@@ -730,7 +907,7 @@ def _train_architecture(
         else:
             bad_epochs += 1
         elapsed = training_seconds + (time.perf_counter() - wall_start)
-        current_peak = int(torch.cuda.max_memory_allocated()) if device.startswith("cuda") else None
+        current_peak = epoch_peak_gpu_memory
         peak_gpu_memory = max(
             [value for value in (prior_peak_gpu_memory, current_peak) if value is not None],
             default=None,
