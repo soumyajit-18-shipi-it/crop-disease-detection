@@ -2,8 +2,6 @@
 
 certifi==2026.2.25
 colorama==0.4.6; platform_system == "Windows"
-httpcore==1.0.9
-httpx==0.28.1
 iniconfig==2.3.0
 pluggy==1.6.0
 Pygments==2.20.0

@@ -65,7 +65,7 @@ def _wait_for_json(url: str, timeout: float = 60.0):
 def _prediction_body() -> tuple[bytes, str]:
     from PIL import Image
 
-    image = Image.new("RGB", (360, 240), color=(70, 130, 70))
+    image = Image.effect_noise((360, 240), 40).convert("RGB")
     image_buffer = BytesIO()
     image.save(image_buffer, format="JPEG")
     boundary = f"leaflight-{uuid.uuid4().hex}"
@@ -77,18 +77,58 @@ def _prediction_body() -> tuple[bytes, str]:
     return body, boundary
 
 
-def _post_prediction(url: str) -> dict:
+def _post_prediction(url: str, session_token: str, csrf_token: str) -> dict:
     body, boundary = _prediction_body()
     request = urllib.request.Request(
         url,
         data=body,
         method="POST",
-        headers={"Content-Type": f"multipart/form-data; boundary={boundary}"},
+        headers={
+            "Content-Type": f"multipart/form-data; boundary={boundary}",
+            "Cookie": f"leaflight_session={session_token}; leaflight_csrf={csrf_token}",
+            "X-CSRF-Token": csrf_token,
+        },
     )
     with urllib.request.urlopen(request, timeout=60) as response:
         if response.status != 200:
             raise RuntimeError(f"POST /predict returned HTTP {response.status}")
-        return json.loads(response.read())
+        payload = response.read()
+        if not payload:
+            raise RuntimeError("POST /predict returned an empty HTTP 200 response")
+        return json.loads(payload)
+
+
+def _create_test_session(staging: Path, environment: dict[str, str]) -> tuple[str, str]:
+    setup = """
+import json
+from backend.api.auth import create_session, isoformat, utc_now
+from backend.db.database import connect_database
+from backend.db.seed_disease_data import seed_database
+
+seed_database()
+now = isoformat(utc_now())
+with connect_database() as connection:
+    connection.execute(
+        \"\"\"INSERT INTO users(
+            id, name, email, auth_provider, provider_account_id, created_at, last_login_at
+        ) VALUES ('clean-clone-user', 'Clean Clone Test', 'clean-clone@example.test',
+                  'google', 'clean-clone-google', ?, ?)\"\"\",
+        (now, now),
+    )
+    connection.commit()
+token, csrf, _ = create_session('clean-clone-user')
+print(json.dumps({'session': token, 'csrf': csrf}))
+"""
+    result = subprocess.run(
+        [sys.executable, "-c", setup],
+        cwd=staging,
+        env=environment,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    payload = json.loads(result.stdout.strip())
+    return str(payload["session"]), str(payload["csrf"])
 
 
 def main() -> int:
@@ -123,7 +163,10 @@ def main() -> int:
     model_thread.start()
     api_process: subprocess.Popen | None = None
     try:
-        with tempfile.TemporaryDirectory(prefix="leaflight-clean-clone-") as temporary:
+        with tempfile.TemporaryDirectory(
+            prefix="leaflight-clean-clone-",
+            ignore_cleanup_errors=(os.name == "nt"),
+        ) as temporary:
             staging = Path(temporary) / "crop-disease-detection"
             staging.mkdir()
             _copy_git_visible_workspace(staging)
@@ -153,7 +196,10 @@ def main() -> int:
                 {
                     "DB_PATH": str(staging / "runtime" / "disease_info.db"),
                     "LOG_DIR": str(staging / "runtime" / "logs"),
+                    "LOG_TO_FILE": "false",
                     "PORT": str(api_port),
+                    "AUTH_SECRET": "clean-clone-only-secret-with-at-least-32-characters",
+                    "COOKIE_SECURE": "false",
                 }
             )
             api_process = subprocess.Popen(
@@ -176,7 +222,8 @@ def main() -> int:
             base_url = f"http://127.0.0.1:{api_port}"
             health_status, health = _wait_for_json(f"{base_url}/health")
             classes_status, classes = _wait_for_json(f"{base_url}/classes")
-            prediction = _post_prediction(f"{base_url}/predict")
+            session_token, csrf_token = _create_test_session(staging, environment)
+            prediction = _post_prediction(f"{base_url}/predict", session_token, csrf_token)
 
             if health_status != 200 or health.get("model_loaded") is not True:
                 raise RuntimeError(f"Unexpected health response: {health}")
@@ -197,16 +244,19 @@ def main() -> int:
             print(download.stdout.strip())
             print("GET /health: 200 (model_loaded=true)")
             print("GET /classes: 200 (15 classes)")
-            print("POST /predict: 200 (real ONNX v1 prediction)")
+            print("POST /predict: 200 (authenticated real ONNX v1 prediction)")
             return 0
     except (OSError, RuntimeError, subprocess.CalledProcessError) as exc:
         print(f"ERROR: clean-clone simulation failed: {exc}", file=sys.stderr)
         if isinstance(exc, subprocess.CalledProcessError) and exc.stderr:
             print(exc.stderr.strip(), file=sys.stderr)
-        if api_process is not None and api_process.poll() is not None:
-            _stdout, stderr = api_process.communicate(timeout=5)
+        if api_process is not None:
+            if api_process.poll() is None:
+                api_process.terminate()
+            _stdout, stderr = api_process.communicate(timeout=10)
             if stderr:
                 print(stderr.strip(), file=sys.stderr)
+            api_process = None
         return 1
     finally:
         if api_process is not None and api_process.poll() is None:

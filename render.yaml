@@ -1,0 +1,41 @@
+services:
+  - type: web
+    name: crop-disease-api
+    runtime: docker
+    plan: free
+    region: singapore
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /health
+    autoDeployTrigger: commit
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: APP_URL
+        value: https://crop-disease.vercel.app
+      - key: CORS_ORIGINS
+        value: https://crop-disease.vercel.app
+      - key: OAUTH_CALLBACK_URL
+        value: https://crop-disease.vercel.app/api/auth/google/callback
+      - key: COOKIE_SECURE
+        value: "true"
+      - key: COOKIE_SAMESITE
+        value: lax
+      - key: LOG_TO_FILE
+        value: "false"
+      - key: MAX_UPLOAD_SIZE_MB
+        value: "10"
+      - key: DATABASE_POOL_MIN_SIZE
+        value: "1"
+      - key: DATABASE_POOL_MAX_SIZE
+        value: "5"
+      - key: DATABASE_CONNECT_TIMEOUT_SECONDS
+        value: "15"
+      - key: DATABASE_URL
+        sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: AUTH_SECRET
+        sync: false

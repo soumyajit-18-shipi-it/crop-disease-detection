@@ -77,7 +77,7 @@ def test_efficientnetv2_s_preprocessing_output_shape_and_dtype():
 
 
 def test_exif_orientation_is_corrected_before_inference():
-    image = Image.new("RGB", (10, 20), color="green")
+    image = Image.new("RGB", (100, 200), color="green")
     exif = Image.Exif()
     exif[274] = 6
     buffer = BytesIO()
@@ -85,7 +85,7 @@ def test_exif_orientation_is_corrected_before_inference():
 
     decoded = _validate_upload(buffer.getvalue(), "image/jpeg")
     assert decoded.mode == "RGB"
-    assert decoded.size == (20, 10)
+    assert decoded.size == (200, 100)
 
 
 def test_class_count_and_class_order_validation(tmp_path):
@@ -152,13 +152,14 @@ def test_invalid_temperature_is_rejected(tmp_path):
 
 def test_single_real_prediction_response_contract(real_model_service, client, monkeypatch):
     monkeypatch.setattr(predict_route, "model_service", real_model_service)
-    image = Image.new("RGB", (420, 280), color=(75, 135, 70))
-    buffer = BytesIO()
-    image.save(buffer, format="JPEG")
+    image_path = next((PROJECT_ROOT / "data" / "processed" / "test").rglob("*.JPG"), None)
+    if image_path is None:
+        image_path = next((PROJECT_ROOT / "data" / "processed" / "test").rglob("*.jpg"))
+    content = image_path.read_bytes()
 
     response = client.post(
         "/predict",
-        files={"file": ("held-out-style-leaf.jpg", buffer.getvalue(), "image/jpeg")},
+        files={"file": (image_path.name, content, "image/jpeg")},
     )
     assert response.status_code == 200
     payload = response.json()
@@ -168,6 +169,8 @@ def test_single_real_prediction_response_contract(real_model_service, client, mo
     assert payload["model_version"] == "v1"
     assert payload["input_size"] == {"width": 300, "height": 300, "channels": 3}
     assert len(payload["top_3_predictions"]) == 3
+    assert payload["scan_id"] > 0
+    assert payload["detection_status"] in {"healthy", "disease_detected", "low_confidence", "review_recommended"}
     assert payload["class_name"] == payload["top_3_predictions"][0]["class_name"]
     assert 0.0 <= payload["confidence"] <= 1.0
 

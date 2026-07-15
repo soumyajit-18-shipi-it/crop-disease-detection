@@ -2,12 +2,18 @@
 __pycache__/
 *.py[cod]
 .pytest_cache/
+**/.pytest-tmp-*/
 .ruff_cache/
 .coverage
 htmlcov/
 venv/
 .venv/
 .env
+.env.*
+!.env.example
+!**/.env.example
+backend/.env
+frontend/.env
 *.log
 backend/logs/
 
@@ -19,6 +25,14 @@ models/checkpoints/*.pth
 models/checkpoints/*.pt
 models/checkpoints/*.ckpt
 artifacts/
+backups/
+*.db
+*.sqlite
+*.sqlite3
+*.db-backup
+*.backup
+uploads/
+backend/uploads/
 # Keep model binaries and training outputs out of Git while tracking the
 # signed-off metadata for the one active production release.
 models/*
@@ -41,6 +55,12 @@ docs/training_logs/
 node_modules/
 frontend/node_modules/
 frontend/dist/
+.vercel/
+.render/
+.tools/
+.deployment-secrets.json
+supabase/.temp/
+supabase/.branches/
 
 # OS and editors
 .DS_Store

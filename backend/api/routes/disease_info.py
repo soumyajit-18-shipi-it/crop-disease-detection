@@ -1,21 +1,19 @@
 from __future__ import annotations
 
-import sqlite3
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
 
-from backend.config import settings
 from backend.api.schemas import DiseaseInfo
+from backend.db.database import connect_database
 
 
 router = APIRouter(tags=["disease-info"])
 
 
-def db_connect(path: str | Path | None = None) -> sqlite3.Connection:
-    conn = sqlite3.connect(Path(path) if path is not None else settings.db_path)
-    conn.row_factory = sqlite3.Row
-    return conn
+def db_connect(path: str | Path | None = None):
+    """Backward-compatible database connection helper."""
+    return connect_database(Path(path)) if path is not None else connect_database()
 
 
 def get_disease_info_by_class(class_name: str) -> dict:
@@ -29,22 +27,26 @@ def get_disease_info_by_class(class_name: str) -> dict:
         ).fetchone()
 
     if row:
-        return dict(row)
+        return {**dict(row), "information_status": "reviewed"}
 
-    crop = class_name.split("_")[0].title() if class_name else None
+    normalized = class_name.replace("___", "_").replace("__", "_")
+    parts = [part for part in normalized.split("_") if part]
+    crop = parts[0].replace("-", " ").title() if parts else None
+    disease_name = " ".join(parts[1:]).replace("-", " ").title() if len(parts) > 1 else None
     return {
         "class_name": class_name,
         "crop": crop,
-        "disease_name": class_name.replace("_", " "),
-        "symptoms": "No reviewed symptoms are available for this class yet.",
-        "recommended_treatment": "Needs expert review before field use.",
-        "severity_level": "needs expert review",
+        "disease_name": disease_name,
+        "symptoms": None,
+        "recommended_treatment": None,
+        "severity_level": None,
+        "information_status": "unavailable",
     }
 
 
 @router.get("/disease/{class_name}", response_model=DiseaseInfo)
 def disease_info(class_name: str) -> DiseaseInfo:
     disease = get_disease_info_by_class(class_name)
-    if disease["symptoms"].startswith("No reviewed"):
+    if disease["symptoms"] is None:
         raise HTTPException(status_code=404, detail=f"No disease info found for {class_name}.")
-    return DiseaseInfo(**disease)
+    return DiseaseInfo(**disease, information_status="reviewed")

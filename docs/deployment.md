@@ -36,8 +36,9 @@ In another shell, verify:
 ```powershell
 Invoke-RestMethod http://127.0.0.1:8000/health
 Invoke-RestMethod http://127.0.0.1:8000/classes
-curl.exe -f -X POST http://127.0.0.1:8000/predict -F "file=@path\to\leaf.jpg;type=image/jpeg"
 ```
+
+Prediction is intentionally authenticated. Complete Google sign-in in the frontend, then upload the image there so the scan is associated with that user. The clean-clone verifier uses a session created only inside its temporary test database; there is no runtime authentication bypass.
 
 The downloader supports all release setup modes:
 
@@ -67,6 +68,14 @@ If a valid model already exists, the first two commands reuse it without contact
 | `CORS_ORIGINS` | local Vite origins | Comma-separated browser origins |
 | `MAX_UPLOAD_SIZE_MB` | `10` | Image upload limit |
 | `PORT` | `8000` in Docker | Listening port used by the container command |
+| `GOOGLE_CLIENT_ID` | unset | Google OAuth Web client ID |
+| `GOOGLE_CLIENT_SECRET` | unset | Google OAuth client secret; backend only |
+| `AUTH_SECRET` | unset | HMAC secret, at least 32 random characters |
+| `APP_URL` | unset | Trusted frontend URL used after OAuth |
+| `OAUTH_CALLBACK_URL` | unset | Exact Google-registered callback URL |
+| `COOKIE_SECURE` | `true` | Require HTTPS for authentication cookies |
+| `COOKIE_SAMESITE` | `lax` | Session cookie same-site policy |
+| `SESSION_TTL_HOURS` | `168` | Server-side session lifetime |
 
 The API never downloads a model at startup. It verifies the manifest, checksum file, metadata, metrics, ONNX size, ONNX SHA-256, metadata/manifest compatibility, and ONNX graph contract. A missing or invalid bundle leaves `/health` at HTTP 503 and prediction endpoints fail closed. The startup log tells the operator to run `python scripts/download_model.py`.
 
@@ -81,7 +90,14 @@ docker build -f backend/Dockerfile -t leaflight-api:efficientnetv2-s-v1 .
 docker volume create leaflight-data
 docker run --rm --name leaflight-api -p 8000:8000 `
   -e PORT=8000 `
-  -e CORS_ORIGINS=http://localhost:5173 `
+  -e CORS_ORIGINS=http://127.0.0.1:5173 `
+  -e GOOGLE_CLIENT_ID="<google-web-client-id>" `
+  -e GOOGLE_CLIENT_SECRET="<google-web-client-secret>" `
+  -e AUTH_SECRET="<at-least-32-random-characters>" `
+  -e APP_URL="http://127.0.0.1:5173" `
+  -e OAUTH_CALLBACK_URL="http://127.0.0.1:8000/auth/google/callback" `
+  -e COOKIE_SECURE=false `
+  -e COOKIE_SAMESITE=lax `
   -v leaflight-data:/data `
   leaflight-api:efficientnetv2-s-v1
 ```
@@ -97,6 +113,7 @@ The build context excludes Git data, virtual environments, frontend dependencies
 3. Persist `/data` using the platform's volume feature.
 4. Set `CORS_ORIGINS` to the deployed frontend origins. The platform may set `PORT` dynamically.
 5. Require `GET /health` to return HTTP 200 before routing traffic.
+6. Configure Google OAuth and cookie settings from `docs/authentication.md`. Use HTTPS and `COOKIE_SECURE=true` in production.
 
 For the frontend on Vercel, use `frontend` as the project root, set `VITE_API_URL` to the deployed backend origin, run `npm run build`, and publish `dist`.
 
@@ -108,7 +125,7 @@ The workflow can also be tested without external network access by serving the e
 python scripts/verify_clean_clone.py
 ```
 
-The script copies only Git-visible files to a temporary directory (the ignored ONNX file is not copied), starts a temporary loopback HTTP server for the existing verified model, downloads and verifies it in the staging copy, starts the real API with a temporary SQLite database, and checks `GET /health`, `GET /classes`, and `POST /predict`. This local test is independent of GitHub availability.
+The script copies only Git-visible files to a temporary directory (the ignored ONNX file is not copied), starts a temporary loopback HTTP server for the existing verified model, downloads and verifies it in the staging copy, starts the real API with a temporary SQLite database, and checks `GET /health`, `GET /classes`, and an authenticated `POST /predict`. This local test is independent of GitHub availability.
 
 ## Troubleshooting
 
@@ -120,6 +137,12 @@ The script copies only Git-visible files to a temporary directory (the ignored O
 | Download fails | Check DNS/TLS/network access, HTTP authorization supplied by the hosting mechanism, URL expiry, and the `--connect-timeout`/`--read-timeout` settings. The repository does not store credentials. |
 | Metadata mismatch | Restore the tracked metadata and manifest for the selected release. Never pair ONNX and metadata files from different exports. |
 | `/health` returns 503 | Read the backend startup error, run `python scripts/download_model.py --verify-only`, and verify the persistent database path is writable. |
+| Google button is disabled | Set all five required OAuth/application variables and restart the API. Inspect `GET /auth/config`. |
+| OAuth `redirect_uri_mismatch` | Register the exact `OAUTH_CALLBACK_URL`, including scheme, host, port, path, case, and trailing slash. |
+| Session immediately returns 401 | Keep the SQLite volume persistent, use a stable `AUTH_SECRET`, and ensure the cookie reaches the API origin. |
+| Mutating request returns 403 | Restore a session so the CSRF cookie is present; the frontend sends it as `X-CSRF-Token`. |
+
+See `docs/authentication.md` for consent-screen setup, local and production origins, the exact callback, secure-cookie deployment guidance, and auth failure handling.
 
 ## Publishing a new model release
 

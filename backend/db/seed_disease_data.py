@@ -1,13 +1,16 @@
 from __future__ import annotations
 
-import json
-import sqlite3
 from pathlib import Path
 
+from backend.db.database import (
+    connect_database,
+    database_backend,
+    migrate_database,
+    validate_database_configuration,
+)
 
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
+
 DB_PATH = Path(__file__).resolve().parent / "disease_info.db"
-MAPPING_PATH = PROJECT_ROOT / "data" / "class_mapping.json"
 
 VERIFIED_ENTRIES = {
     "Tomato_Early_blight": (
@@ -55,84 +58,34 @@ VERIFIED_ENTRIES = {
 }
 
 
-def _load_classes() -> list[str]:
-    if not MAPPING_PATH.exists():
-        return sorted(VERIFIED_ENTRIES)
-    with MAPPING_PATH.open("r", encoding="utf-8") as file:
-        payload = json.load(file)
-    if "idx_to_class" in payload:
-        return [payload["idx_to_class"][key] for key in sorted(payload["idx_to_class"], key=lambda x: int(x))]
-    return [payload[key] for key in sorted(payload, key=lambda x: int(x))]
-
-
-def _infer_crop_and_disease(class_name: str) -> tuple[str, str]:
-    parts = class_name.replace("___", "_").split("_")
-    crop = parts[0].replace("-", " ").title() if parts else "Unknown"
-    disease = " ".join(parts[1:]).replace("-", " ").title() if len(parts) > 1 else class_name
-    return crop, disease
-
-
 def seed_database(db_path: str | Path | None = None) -> None:
-    target_path = Path(db_path).resolve() if db_path is not None else DB_PATH
-    target_path.parent.mkdir(parents=True, exist_ok=True)
-    classes = _load_classes()
-    with sqlite3.connect(target_path) as conn:
-        conn.execute("DROP TABLE IF EXISTS diseases")
+    if db_path is not None:
+        target_path = Path(db_path).resolve()
+        target_path.parent.mkdir(parents=True, exist_ok=True)
+        migrate_database(target_path)
+        connection_context = connect_database(target_path)
+    else:
+        validate_database_configuration()
+        connection_context = connect_database()
+    with connection_context as conn:
+        placeholders = ",".join("?" for _ in VERIFIED_ENTRIES)
         conn.execute(
-            """
-            CREATE TABLE IF NOT EXISTS diseases (
-                class_name TEXT PRIMARY KEY,
-                crop TEXT,
-                disease_name TEXT,
-                symptoms TEXT NOT NULL,
-                recommended_treatment TEXT NOT NULL,
-                severity_level TEXT
-            )
-            """
+            f"DELETE FROM diseases WHERE class_name NOT IN ({placeholders})",
+            tuple(VERIFIED_ENTRIES),
         )
-        conn.execute(
-            """
-            CREATE TABLE IF NOT EXISTS scans (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                timestamp TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                predicted_class TEXT NOT NULL,
-                confidence REAL NOT NULL,
-                image_hash TEXT NOT NULL
-            )
-            """
-        )
-        conn.execute(
-            """
-            CREATE TABLE IF NOT EXISTS feedback (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                timestamp TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                predicted_class TEXT NOT NULL,
-                confidence REAL,
-                message TEXT
-            )
-            """
-        )
-        for class_name in classes:
-            crop, disease_name, symptoms, treatment, severity = VERIFIED_ENTRIES.get(
-                class_name,
-                (
-                    *_infer_crop_and_disease(class_name),
-                    (
-                        "Placeholder disease description needs expert review. Visual symptoms should be validated "
-                        "against local crop pathology guidance before use in field decisions."
-                    ),
-                    (
-                        "Needs expert review. Do not make pesticide, disposal, or harvest decisions from this placeholder "
-                        "entry alone; consult local agricultural extension or a qualified agronomist."
-                    ),
-                    "needs expert review",
-                ),
-            )
+        for class_name, entry in VERIFIED_ENTRIES.items():
+            crop, disease_name, symptoms, treatment, severity = entry
             conn.execute(
                 """
-                INSERT OR REPLACE INTO diseases
+                INSERT INTO diseases
                     (class_name, crop, disease_name, symptoms, recommended_treatment, severity_level)
                 VALUES (?, ?, ?, ?, ?, ?)
+                ON CONFLICT(class_name) DO UPDATE SET
+                    crop = excluded.crop,
+                    disease_name = excluded.disease_name,
+                    symptoms = excluded.symptoms,
+                    recommended_treatment = excluded.recommended_treatment,
+                    severity_level = excluded.severity_level
                 """,
                 (class_name, crop, disease_name, symptoms, treatment, severity),
             )
@@ -140,5 +93,6 @@ def seed_database(db_path: str | Path | None = None) -> None:
 
 
 if __name__ == "__main__":
+    validate_database_configuration()
     seed_database()
-    print(f"Seeded disease info database at {DB_PATH}")
+    print(f"Seeded verified disease metadata using {database_backend()}.")

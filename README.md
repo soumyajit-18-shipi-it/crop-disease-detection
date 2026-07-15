@@ -15,14 +15,17 @@ Leaflight is a full-stack crop disease detection platform for analyzing plant le
 - Crop, severity, symptoms, and recommended-treatment guidance from SQLite.
 - Helpful/not-helpful feedback logging.
 - Recent scan field log plus a dashboard with total scans, most-common diagnosis, average confidence, healthy/diseased ratio, disease-frequency chart, and timestamped history cards.
-- Responsive Scan, Dashboard, and About views.
+- Responsive Dashboard, New scan, Scan history, and Profile views.
+- Google OAuth sign-in with private, user-owned scan history and dashboard statistics.
+- Server-side opaque sessions, CSRF protection, expiry, restoration, and logout revocation.
 
 ### FastAPI backend
 
 - Single-image and batch prediction endpoints backed by ONNX Runtime.
 - Strict server-side image validation, configurable upload limit, and SHA-256 image hashes.
 - Health, supported-class, disease-information, scan-history, and feedback endpoints.
-- Automatic SQLite schema/data seeding at startup.
+- Authenticated dashboard aggregation plus user-scoped prediction, history, and feedback endpoints.
+- Idempotent SQLite schema migrations and reviewed disease-data seeding at startup.
 - CORS configuration and rotating request logs.
 - Interactive OpenAPI documentation at `http://127.0.0.1:8000/docs`.
 
@@ -114,13 +117,33 @@ npm.cmd --prefix frontend install
 
 The inference environment is pinned for Python 3.11 and excludes the CUDA/PyTorch training stack. Contributors running backend tests should install `backend/requirements-dev.txt`; training work still uses the separate root `requirements.txt`. Vite requires Node.js 18 or newer.
 
-### 2. Configure the services
+### 2. Configure the services and Google sign-in
 
-The frontend defaults to `http://127.0.0.1:8000`. To override it:
+Set the frontend API origin:
 
 ```powershell
 $env:VITE_API_URL="http://127.0.0.1:8000"
 ```
+
+Create a Google OAuth Web application and register this exact local redirect URI:
+
+```text
+http://127.0.0.1:8000/auth/google/callback
+```
+
+Then export the backend authentication configuration:
+
+```powershell
+$env:GOOGLE_CLIENT_ID="<google-web-client-id>"
+$env:GOOGLE_CLIENT_SECRET="<google-web-client-secret>"
+$env:AUTH_SECRET="<at-least-32-random-characters>"
+$env:APP_URL="http://127.0.0.1:5173"
+$env:OAUTH_CALLBACK_URL="http://127.0.0.1:8000/auth/google/callback"
+$env:CORS_ORIGINS="http://127.0.0.1:5173"
+$env:COOKIE_SECURE="false"
+```
+
+Use `COOKIE_SECURE=true` with HTTPS in production. Full consent-screen, origin, redirect, cookie, and failure-mode setup is in [docs/authentication.md](docs/authentication.md). No Google access or refresh token is stored.
 
 Backend configuration is read from environment variables:
 
@@ -131,10 +154,19 @@ Backend configuration is read from environment variables:
 | `MODEL_RELEASE_MANIFEST` | `models/releases/efficientnetv2_s_v1/release.json` |
 | `LEAFLIGHT_MODEL_URL` | optional override for the release manifest URL |
 | `DB_PATH` | `backend/db/disease_info.db` |
-| `CORS_ORIGINS` | `http://localhost:5173,http://127.0.0.1:5173` |
+| `CORS_ORIGINS` | `http://127.0.0.1:5173` |
 | `MAX_UPLOAD_SIZE_MB` | `10` |
+| `GOOGLE_CLIENT_ID` | required for sign-in |
+| `GOOGLE_CLIENT_SECRET` | required for sign-in; backend only |
+| `AUTH_SECRET` | required; at least 32 random characters |
+| `APP_URL` | trusted frontend origin |
+| `OAUTH_CALLBACK_URL` | exact registered Google callback |
+| `COOKIE_SECURE` | `true`; set `false` only for local HTTP |
+| `COOKIE_SAMESITE` | `lax` |
+| `COOKIE_DOMAIN` | unset; leave unset for `127.0.0.1` development |
+| `SESSION_TTL_HOURS` | `168` |
 
-The included `.env.example` files are references; export the variables in your shell because the application does not auto-load `.env` files.
+The backend automatically loads `backend/.env`, and Vite automatically loads `frontend/.env`. Both real files are ignored by Git; the tracked `.env.example` files contain names only.
 
 ### 3. Download and verify the model release
 
@@ -195,11 +227,19 @@ The image verifies the release during build, runs as a non-root user, supports a
 |---|---|---|
 | `GET` | `/health` | API, model, and database status |
 | `GET` | `/classes` | Classes loaded from model metadata |
-| `POST` | `/predict` | Analyze one image |
-| `POST` | `/predict/batch` | Analyze multiple images |
+| `GET` | `/auth/config` | Report whether Google sign-in is configured |
+| `GET` | `/auth/google/login` | Start the Google OAuth code flow |
+| `GET` | `/auth/google/callback` | Validate OAuth state and create a session |
+| `GET` | `/auth/session` | Restore the authenticated user session |
+| `POST` | `/auth/logout` | Revoke the current session |
+| `POST` | `/predict` | Analyze one image and save an owned scan |
+| `POST` | `/predict/batch` | Analyze multiple images and save owned scans |
 | `GET` | `/disease/{class_name}` | Disease details and guidance |
-| `GET` | `/history?limit=50` | Recent scans (1–200 records) |
-| `POST` | `/feedback` | Record result feedback |
+| `GET` | `/dashboard` | User-owned statistics, distribution, and recent scans |
+| `GET` | `/history?limit=50` | User-owned scans (1–200 records) |
+| `POST` | `/feedback` | Record user-owned result feedback |
+
+`/health`, `/classes`, `/auth/config`, and the OAuth start/callback endpoints are public. Session, dashboard, history, prediction, feedback, profile, and logout behavior is authenticated; mutating routes require the CSRF header sent by the frontend.
 
 ## Dataset Workflow
 
@@ -301,6 +341,7 @@ See `docs/deployment.md` for the complete clean-clone, Docker, troubleshooting, 
 - PlantVillage contains many lab-condition leaf photos; field performance can be lower under variable lighting, clutter, occlusion, or mixed symptoms.
 - Disease and treatment guidance is decision support, not a substitute for local agronomy advice.
 - The UI displays `MODEL LIVE` only when `/health` explicitly reports `model_loaded: true`.
+- A live Google sign-in cannot be verified without deployer-provided OAuth credentials; automated tests mock Google and exercise state, callback, session, expiry, ownership, and CSRF behavior without external requests.
 - Prediction endpoints intentionally fail closed when a complete ONNX bundle is unavailable.
 - The reported metrics describe the held-out Phase 2.5 split and should not be generalized to unconstrained field conditions.
 

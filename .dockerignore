@@ -11,12 +11,18 @@ htmlcov
 
 .env
 .env.*
+.deployment-secrets.json
 *.log
 *.tmp
 *.temp
 *.part
 tmp
 temp
+backups
+.tools
+.vercel
+.render
+supabase/.temp
 
 frontend/node_modules
 frontend/dist
@@ -46,5 +52,7 @@ models/releases/efficientnetv2_s_v1/*
 **/checkpoints
 
 backend/db/*.db
+*.sqlite
+*.sqlite3
 tests
 backend/tests

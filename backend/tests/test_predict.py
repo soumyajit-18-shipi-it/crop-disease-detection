@@ -7,8 +7,10 @@ import numpy as np
 from PIL import Image
 import pytest
 
-def dummy_image_bytes(size=(32, 32)) -> bytes:
-    image = Image.new("RGB", size, color=(80, 140, 80))
+def dummy_image_bytes(size=(128, 128)) -> bytes:
+    pixels = np.indices((size[1], size[0])).sum(axis=0) % 2
+    array = np.stack((pixels * 120 + 40, pixels * 80 + 80, pixels * 60 + 50), axis=-1).astype(np.uint8)
+    image = Image.fromarray(array, mode="RGB")
     buffer = BytesIO()
     image.save(buffer, format="JPEG")
     return buffer.getvalue()
@@ -100,7 +102,7 @@ def test_predict_returns_503_without_model(client, monkeypatch):
 def test_predict_rejects_invalid_file_type(client):
     files = {"file": ("notes.txt", b"not-an-image", "text/plain")}
     response = client.post("/predict", files=files)
-    assert response.status_code == 400
+    assert response.status_code == 415
 
 
 def test_predict_rejects_unreadable_image(client):
