@@ -1,0 +1,5 @@
+models/releases/**/model.onnx binary
+models/releases/**/model.json text eol=lf
+models/releases/**/metrics.json text eol=lf
+models/releases/**/release.json text eol=lf
+models/releases/**/checksum.sha256 text eol=lf

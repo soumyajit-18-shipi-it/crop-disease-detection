@@ -19,7 +19,17 @@ models/checkpoints/*.pth
 models/checkpoints/*.pt
 models/checkpoints/*.ckpt
 artifacts/
-models/
+# Keep model binaries and training outputs out of Git while tracking the
+# signed-off metadata for the one active production release.
+models/*
+!models/releases/
+models/releases/*
+!models/releases/efficientnetv2_s_v1/
+models/releases/efficientnetv2_s_v1/*
+!models/releases/efficientnetv2_s_v1/model.json
+!models/releases/efficientnetv2_s_v1/metrics.json
+!models/releases/efficientnetv2_s_v1/checksum.sha256
+!models/releases/efficientnetv2_s_v1/release.json
 wandb/
 mlruns/
 docs/model_performance_report.md
