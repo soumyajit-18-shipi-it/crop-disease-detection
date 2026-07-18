@@ -1,0 +1,233 @@
+{
+  "schema_version": "1.0",
+  "generated_at": "2026-07-18T23:52:10+05:30",
+  "datasets": [
+    {
+      "name": "plantvillage",
+      "display_name": "PlantVillage",
+      "source": {
+        "type": "kaggle",
+        "slug": "emmarex/plantdisease",
+        "verified": true,
+        "reference": "src/data/download_data.py"
+      },
+      "version": {
+        "download_date": "unknown",
+        "dataset_version": "unknown",
+        "verified": false
+      },
+      "checksum": {
+        "expected_sha256": "unknown",
+        "verified": false
+      },
+      "license": {
+        "name": "unknown",
+        "spdx_id": "unknown",
+        "commercial_use": "unknown",
+        "attribution_required": "unknown",
+        "verified": false
+      },
+      "allowed_usage": [
+        "training",
+        "evaluation",
+        "benchmarking"
+      ],
+      "crop_class_coverage": {
+        "crops": [
+          "Pepper__bell",
+          "Potato",
+          "Tomato"
+        ],
+        "class_count": 15,
+        "class_names": [
+          "Pepper__bell___Bacterial_spot",
+          "Pepper__bell___healthy",
+          "Potato___Early_blight",
+          "Potato___Late_blight",
+          "Potato___healthy",
+          "Tomato_Bacterial_spot",
+          "Tomato_Early_blight",
+          "Tomato_Late_blight",
+          "Tomato_Leaf_Mold",
+          "Tomato_Septoria_leaf_spot",
+          "Tomato_Spider_mites_Two_spotted_spider_mite",
+          "Tomato__Target_Spot",
+          "Tomato__Tomato_YellowLeaf__Curl_Virus",
+          "Tomato__Tomato_mosaic_virus",
+          "Tomato_healthy"
+        ],
+        "verified": true,
+        "reference": "data/class_mapping.json"
+      },
+      "review_status": "approved_for_training",
+      "personal_data_risk": "none",
+      "split_eligibility": {
+        "eligible": true,
+        "split_policy": "stratified_duplicate_safe_split",
+        "duplicate_isolation": true,
+        "seed": 42,
+        "ratios": {
+          "train": 0.7,
+          "val": 0.15,
+          "test": 0.15
+        },
+        "verified": true,
+        "reference": "src/data/split_dataset.py"
+      },
+      "storage": {
+        "raw_path": "data/raw/PlantVillage",
+        "processed_path": "data/processed",
+        "split_manifest": "data/splits/phase1_split.json",
+        "verified": true
+      },
+      "maintainer_notes": "Primary training dataset. Split into train/val/test with stratified duplicate-safe grouping. Used in Phase 1 and Phase 2.5 training."
+    },
+    {
+      "name": "plantdoc",
+      "display_name": "PlantDoc",
+      "source": {
+        "type": "unknown",
+        "slug": "unknown",
+        "verified": false
+      },
+      "version": {
+        "download_date": "unknown",
+        "dataset_version": "unknown",
+        "verified": false
+      },
+      "checksum": {
+        "expected_sha256": "unknown",
+        "verified": false
+      },
+      "license": {
+        "name": "unknown",
+        "spdx_id": "unknown",
+        "commercial_use": "unknown",
+        "attribution_required": "unknown",
+        "verified": false
+      },
+      "allowed_usage": [],
+      "crop_class_coverage": {
+        "crops": [],
+        "class_count": 0,
+        "class_names": [],
+        "verified": false
+      },
+      "review_status": "pending_ingestion",
+      "personal_data_risk": "unknown",
+      "split_eligibility": {
+        "eligible": false,
+        "reason": "dataset_not_present",
+        "verified": true
+      },
+      "storage": {
+        "raw_path": "data/raw/PlantDoc",
+        "processed_path": null,
+        "split_manifest": null,
+        "verified": true,
+        "note": "Directory does not exist in current working tree. Configured as optional in configs/training/phase2_5.yaml and configs/training/phase1.yaml."
+      },
+      "maintainer_notes": "Configured as optional dataset source. Directory is absent. No records have been ingested or reviewed."
+    },
+    {
+      "name": "field_survey",
+      "display_name": "Field Survey 2023",
+      "source": {
+        "type": "internal_survey",
+        "form_name": "Leaf_disease_detection_form",
+        "survey_file": "data/raw/PlantVillage/FieldSurvey2023/Leaf_disease_detection_form_-_latest_version_-_False_-_2026-07-12-08-39-48.csv",
+        "image_root": "data/raw/PlantVillage/FieldSurvey2023/image",
+        "verified": true,
+        "reference": "data/manifests/field_survey/manifest.json"
+      },
+      "version": {
+        "download_date": "2026-07-12",
+        "dataset_version": "unknown",
+        "verified": false
+      },
+      "checksum": {
+        "expected_sha256": "unknown",
+        "verified": false
+      },
+      "license": {
+        "name": "unknown",
+        "spdx_id": "unknown",
+        "commercial_use": "unknown",
+        "attribution_required": "unknown",
+        "verified": false
+      },
+      "allowed_usage": [
+        "evaluation_pending_review",
+        "training_pending_review"
+      ],
+      "crop_class_coverage": {
+        "crops": [
+          "Tomato",
+          "Rice",
+          "Cotton",
+          "Papaya",
+          "Guava",
+          "Brinjal",
+          "Cucumber",
+          "Lemon",
+          "Okra",
+          "Corn",
+          "Beans",
+          "Chilli",
+          "Broad Beans",
+          "Drumstick",
+          "Red Gram",
+          "Green Gram",
+          "Green Peas",
+          "Sugar Cane",
+          "Bottle Gourd"
+        ],
+        "class_count": "multiple",
+        "class_names": [
+          "unknown"
+        ],
+        "verified": false,
+        "note": "Labels are free-text survey responses. Canonical taxonomy is provisional and requires domain validation."
+      },
+      "review_status": "pending_manual_approval",
+      "personal_data_risk": {
+        "level": "high",
+        "fields": [
+          "Name_of_the_Surveyer",
+          "Team_Number",
+          "College_name",
+          "_Farmer_Name",
+          "_id",
+          "_uuid",
+          "_submission_time"
+        ],
+        "verified": true,
+        "reference": "src/data/ingest_field_survey.py DEFAULT_METADATA_COLUMNS"
+      },
+      "split_eligibility": {
+        "eligible": false,
+        "reason": "awaiting_human_review",
+        "verified": true
+      },
+      "storage": {
+        "raw_path": "data/raw/PlantVillage/FieldSurvey2023",
+        "processed_path": null,
+        "split_manifest": null,
+        "manifest_path": "data/manifests/field_survey/manifest.json",
+        "cleaned_manifest_path": "data/manifests/field_survey/cleaned_manifest.json",
+        "validated_manifest_path": "data/manifests/field_survey/validated_manifest.json",
+        "training_manifest_path": "data/manifests/field_survey/training_manifest.json",
+        "decisions_log": "data/manifests/field_survey/review_decisions.jsonl",
+        "verified": true
+      },
+      "maintainer_notes": "Field survey images and metadata require human review before training use. The detailed validated_manifest.json is review-only and may retain restricted metadata. Registry/training may consume only the sanitized training_manifest.json generated from human-approved records."
+    }
+  ],
+  "governance_policy": {
+    "version": "1.0",
+    "training_eligibility_rule": "Only datasets with review_status=approved_for_training and split_eligibility.eligible=true may enter training manifests.",
+    "personal_data_rule": "Datasets with personal_data_risk.level=high require explicit metadata stripping before manifest generation.",
+    "unknown_fields_policy": "Unverified licence, version, or checksum fields must be recorded as unknown, not guessed.",
+    "fabrication_policy": "Do not invent chemical names, dosages, licence terms, or dataset statistics."
+  }
+}

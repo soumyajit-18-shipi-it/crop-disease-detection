@@ -6,6 +6,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Iterable
 
+from src.data.validate_field_survey_manifest import (
+    TRAINING_MANIFEST_TYPE,
+    PrivacyAuditError,
+    validate_training_manifest,
+)
 from src.training.config import DatasetSourceConfig
 
 
@@ -91,20 +96,38 @@ def load_pre_split_image_folder(config: DatasetSourceConfig) -> list[SampleRecor
 
 @register_dataset("validated_manifest")
 def load_validated_manifest(config: DatasetSourceConfig) -> list[SampleRecord]:
+    raise ValueError(
+        "Detailed field-survey review manifests are not training-safe. "
+        "Use dataset type 'field_survey_training_manifest' with "
+        "data/manifests/field_survey/training_manifest.json."
+    )
+
+
+@register_dataset("field_survey_training_manifest")
+def load_field_survey_training_manifest(config: DatasetSourceConfig) -> list[SampleRecord]:
     path = Path(config.path)
     if not path.exists():
         return []
+    if path.name == "validated_manifest.json":
+        raise ValueError(
+            "Refusing to load validated_manifest.json as training data; "
+            "use the sanitized field-survey training manifest."
+        )
+    try:
+        validate_training_manifest(path, path_root=Path.cwd())
+    except PrivacyAuditError as exc:
+        raise ValueError(f"Invalid field-survey training manifest {path}: {exc}") from exc
     payload = json.loads(path.read_text(encoding="utf-8"))
+    if payload.get("manifest_type") != TRAINING_MANIFEST_TYPE:
+        raise ValueError(f"Invalid field-survey training manifest type in {path}")
     records = []
     for record in payload.get("records", []):
-        validation = record.get("validation", {})
-        # This hard gate cannot be relaxed through YAML.
-        if validation.get("eligible_for_training") is not True:
-            continue
-        image_path = Path(str(record.get("image_path") or ""))
-        label = str(validation.get("canonical_disease") or "").strip()
-        if image_path.is_file() and label:
-            records.append(_sample(image_path, label, config.name))
+        image_path = Path(str(record["image_path"]))
+        label = str(record["canonical_class"]).strip()
+        identity = hashlib.sha256(
+            f"{config.name}\0{record['record_id']}\0{record['image_sha256']}".encode()
+        ).hexdigest()
+        records.append(SampleRecord(image_path.as_posix(), label, config.name, identity))
     return records
 
 

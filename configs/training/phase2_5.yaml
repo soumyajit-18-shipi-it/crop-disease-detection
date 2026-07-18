@@ -10,8 +10,8 @@ data:
       path: data/raw/PlantDoc
       optional: true
     - name: field_survey
-      type: validated_manifest
-      path: data/manifests/field_survey/validated_manifest.json
+      type: field_survey_training_manifest
+      path: data/manifests/field_survey/training_manifest.json
       optional: true
       enabled: true
   # Phase 2.5 deliberately reuses this immutable manifest. Do not force-rebuild

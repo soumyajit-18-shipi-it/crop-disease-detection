@@ -101,7 +101,7 @@ These measurements come from the persisted Phase 2.5 evaluation artifacts. Valid
 
 | Layer | Technologies |
 |---|---|
-| Frontend | React 18, Vite 5, Axios, Recharts |
+| Frontend | React 18, Vite 5, native Fetch API, Recharts |
 | API | FastAPI, Uvicorn, Pydantic, Pillow |
 | Inference | ONNX Runtime, NumPy, OpenCV |
 | Training | PyTorch, torchvision, timm, Albumentations, scikit-learn |
